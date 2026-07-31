@@ -12,7 +12,7 @@ Diagnose the target first, then use the smallest workflow that proves the reques
 1. Read `references/privacy.md`. Establish the allowed project, Simulator, device, log, and screenshot scope before inspecting or launching anything.
 2. Locate the app directory containing `appinfo.json` from the current working directory or workspace root. Preserve unrelated and untracked files. Never infer the app location from this Skill's own absolute path, and never reuse a remembered machine-specific path without verifying it locally.
 3. Run `scripts/check-webos-project.sh APP_DIR` before launch or deployment.
-4. Select one path:
+4. If the host is Windows PowerShell, read `references/windows.md` for the host setup, CLI, download, path, and device-command conventions. Then select one path:
    - For Simulator work, read `references/simulator.md` and use `scripts/run-simulator.sh` when its arguments fit.
    - For a real TV, read `references/real-device.md`. Run `scripts/deploy-to-tv.sh` only when the user asked to install or launch on that TV.
    - For playback failures, also read `references/media-diagnostics.md` before changing application code.
