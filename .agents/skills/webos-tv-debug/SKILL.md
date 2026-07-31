@@ -5,11 +5,11 @@ description: Run, inspect, deploy, and diagnose webOS TV web apps on LG webOS TV
 
 # webOS TV Debug
 
-Diagnose the target first, then use the smallest workflow that proves the requested outcome.
+Diagnose the target first, then use the smallest workflow that proves the requested outcome. Privacy is a hard prerequisite, not a reporting preference: if the privacy gate cannot be completed, stop before discovery, launch, packaging, deployment, screenshots, Inspector access, or external reporting.
 
 ## Workflow
 
-1. Read `references/privacy.md`. Establish the allowed project, Simulator, device, log, and screenshot scope before inspecting or launching anything.
+1. **Mandatory privacy gate:** read `references/privacy.md` completely. Establish the allowed project, Simulator, device, log, screenshot, network, and artifact scope before inspecting or launching anything. Confirm that private URLs, configuration, credentials, device identifiers, logs, screenshots, and IPKs will stay local and redacted. If any item is unknown, pause and resolve it before continuing.
 2. Locate the app directory containing `appinfo.json` from the current working directory or workspace root. Preserve unrelated and untracked files. Never infer the app location from this Skill's own absolute path, and never reuse a remembered machine-specific path without verifying it locally.
 3. Run `scripts/check-webos-project.sh APP_DIR` before launch or deployment.
 4. If the host is Windows PowerShell, read `references/windows.md` for the host setup, CLI, download, path, and device-command conventions. Then select one path:
@@ -18,6 +18,18 @@ Diagnose the target first, then use the smallest workflow that proves the reques
    - For playback failures, also read `references/media-diagnostics.md` before changing application code.
 5. Verify the actual outcome with the least revealing evidence: process and accessibility state before screenshots; sanitized device/Inspector data before raw logs.
 6. Report Simulator results separately from real-TV media conclusions, including what local or remote network requests the app initiated.
+
+## Required privacy checks
+
+Run these checks before each consequential phase and again before any commit, upload, screenshot handoff, or user-facing report:
+
+- **Before discovery:** scope roots and targets; do not scan beyond bounded project, SDK, and user-provided locations.
+- **Before launch or deployment:** confirm local configuration exists only where intended, endpoints are categorized without printing them, and real-TV state changes are explicitly authorized.
+- **Before logs or screenshots:** prefer sanitized process/accessibility evidence; if visual capture is necessary, warn that visible content enters the task context and redact private content.
+- **Before packaging or sharing:** inspect only metadata needed for validation; never expose or publish `config.js`, private URLs, headers, cookies, tokens, passphrases, keys, raw logs, or IPKs containing them.
+- **Before reporting or committing:** search the proposed output/diff for account-bearing paths, IP addresses, hostnames, query strings, credentials, and raw diagnostic content. Remove or replace them with placeholders and categories.
+
+Failure of any check is a hard stop. Do not continue by assumption, and do not claim success from an earlier lifecycle step.
 
 ## Guardrails
 
