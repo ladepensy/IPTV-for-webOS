@@ -2,7 +2,9 @@
   "use strict";
 
   var config = window.IPTV_CONFIG || {};
-  var PLAYLIST_URL = config.playlistUrl || "";
+  var playlistConfig = config.playlist || {};
+  var PLAYLIST_URL = playlistConfig.url || config.playlistUrl || "";
+  var PLAYLIST_REQUEST = playlistConfig.request || config.playlistRequest || {};
   var channels = [];
   var focusedIndex = 0;
   var playingIndex = -1;
@@ -30,7 +32,15 @@
     return attributes;
   }
 
-  function parseM3U(text) {
+  function resolveUrl(url, baseUrl) {
+    try {
+      return new URL(url, baseUrl).href;
+    } catch (error) {
+      return url;
+    }
+  }
+
+  function parseM3U(text, baseUrl) {
     var lines = text.split(/\r?\n/);
     var result = [];
     var pending = null;
@@ -57,14 +67,46 @@
         return;
       }
 
-      if (line.charAt(0) !== "#" && pending) {
-        pending.url = line;
-        result.push(pending);
+      if (line.charAt(0) !== "#") {
+        var channel = pending || {
+          id: "",
+          name: "频道 " + String(result.length + 1).padStart(3, "0"),
+          logo: "",
+          group: "其他",
+          url: ""
+        };
+
+        channel.url = resolveUrl(line, baseUrl);
+        result.push(channel);
         pending = null;
       }
     });
 
     return result;
+  }
+
+  function buildPlaylistRequestOptions() {
+    var options = {
+      method: (PLAYLIST_REQUEST.method || "GET").toUpperCase(),
+      cache: PLAYLIST_REQUEST.cache || "no-store"
+    };
+    var optionalFields = [
+      "headers",
+      "body",
+      "credentials",
+      "mode",
+      "redirect",
+      "referrer",
+      "referrerPolicy"
+    ];
+
+    optionalFields.forEach(function (field) {
+      if (PLAYLIST_REQUEST[field] !== undefined) {
+        options[field] = PLAYLIST_REQUEST[field];
+      }
+    });
+
+    return options;
   }
 
   function setConnectionState(label, stateClass) {
@@ -167,15 +209,20 @@
 
     setConnectionState("连接中", "");
 
-    fetch(PLAYLIST_URL, { cache: "no-store" })
+    fetch(PLAYLIST_URL, buildPlaylistRequestOptions())
       .then(function (response) {
         if (!response.ok) {
           throw new Error("HTTP " + response.status);
         }
-        return response.text();
+        return response.text().then(function (text) {
+          return {
+            text: text,
+            baseUrl: response.url || PLAYLIST_URL
+          };
+        });
       })
-      .then(function (text) {
-        channels = parseM3U(text);
+      .then(function (playlist) {
+        channels = parseM3U(playlist.text, playlist.baseUrl);
         if (!channels.length) {
           throw new Error("播放列表中没有频道");
         }
@@ -187,7 +234,7 @@
       })
       .catch(function (error) {
         currentTitle.textContent = "播放列表加载失败";
-        playerMessage.textContent = error.message + " · 请确认 IPTV 服务器在线";
+        playerMessage.textContent = error.message + " · 请确认 M3U 数据源可访问";
         setConnectionState("连接失败", "is-error");
       });
   }
