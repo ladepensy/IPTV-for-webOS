@@ -206,6 +206,19 @@ h1 {
   text-align: center;
 }
 
+.player-diagnostics {
+  max-width: 720px;
+  padding: 14px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.34);
+  color: #c9d0dc;
+  font-size: 14px;
+  line-height: 1.7;
+  text-align: left;
+  white-space: pre-line;
+}
+
 .player-placeholder.is-hidden {
   display: none;
 }

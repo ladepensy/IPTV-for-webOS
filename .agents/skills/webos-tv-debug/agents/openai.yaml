@@ -1,4 +1,4 @@
 interface:
   display_name: "webOS TV Debug"
-  short_description: "Run simulators, deploy TVs, and diagnose media"
-  default_prompt: "Use $webos-tv-debug to run and diagnose this webOS TV app on a Simulator or real TV."
+  short_description: "Privately run simulators, TVs, and media diagnostics"
+  default_prompt: "Use $webos-tv-debug to privately discover the environment, run this webOS TV app, and return redacted diagnostics."

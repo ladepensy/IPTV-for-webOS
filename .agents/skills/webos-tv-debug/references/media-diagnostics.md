@@ -11,7 +11,7 @@ Diagnose in this order:
 5. **Container and codecs**: distinguish MPEG-TS, HLS, MP4, H.264, HEVC, MPEG-2, and audio codecs.
 6. **Target difference**: reproduce on a real TV before concluding a Simulator media failure affects production hardware.
 
-Sanitize URLs to protocol, host category, port, and path suffix. Never print embedded credentials, query tokens, headers, or local config contents.
+Read `privacy.md` first. Reduce URLs to protocol class, host category, and media extension/container. Never print hosts, paths, embedded credentials, query values, headers, cookies, request bodies, or local config contents.
 
 ## Common interpretation
 
@@ -23,19 +23,24 @@ HLS availability and codec support are separate. A target may understand an HLS 
 
 ## App instrumentation
 
-Preserve the rejected `video.play()` error during diagnosis. Add or inspect handlers for:
+Preserve only normalized fields from rejected `video.play()` and media errors. Do not log the raw error message because it may contain a URL. Add or inspect handlers such as:
 
 ```js
 video.play().catch(function (error) {
-  console.error(error.name, error.message);
+  recordSafeDiagnostic({ stage: "play", name: error.name || "Error" });
 });
 
 video.addEventListener("error", function () {
-  console.error(video.error && video.error.code, video.error && video.error.message);
+  recordSafeDiagnostic({
+    stage: "media",
+    code: video.error && video.error.code,
+    networkState: video.networkState,
+    readyState: video.readyState
+  });
 });
 ```
 
-Do not leave private URLs or authorization headers in logs.
+Keep `recordSafeDiagnostic` local and bounded. Do not leave private URLs, raw messages, or authorization data in logs.
 
 Official references:
 

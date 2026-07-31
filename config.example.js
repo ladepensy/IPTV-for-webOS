@@ -4,5 +4,11 @@ window.IPTV_CONFIG = {
     request: {
       method: "GET"
     }
+  },
+  playback: {
+    startupTimeoutMs: 15000,
+    stallTimeoutMs: 12000,
+    maxRetries: 2,
+    retryDelayMs: 1200
   }
 };

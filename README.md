@@ -255,6 +255,8 @@ LG 官方文档：
 | OK | 播放选中的频道 |
 | Back | 播放时先停止；再次按下退出应用 |
 | Page Up / Page Down | 在电脑调试时快速跳过 8 个频道 |
+| Magic Remote 指针 | 悬停频道时同步焦点，点击播放 |
+| Magic Remote 滚轮 | 向上或向下移动一个频道 |
 
 ## M3U 数据源配置
 
@@ -267,9 +269,19 @@ window.IPTV_CONFIG = {
     request: {
       method: "GET"
     }
+  },
+  playback: {
+    startupTimeoutMs: 15000,
+    stallTimeoutMs: 12000,
+    maxRetries: 2,
+    retryDelayMs: 1200
   }
 };
 ```
+
+`playback` 为可选播放容错配置：起播超过 `startupTimeoutMs`，或者已经播放后连续缓冲超过 `stallTimeoutMs`，应用会按 `retryDelayMs` 间隔重新加载当前频道，最多重试 `maxRetries` 次。切换频道或手动按 OK 会重置重试次数。
+
+播放失败时界面会显示脱敏诊断，包括 `MediaError`、`networkState`、`readyState`、推断的流类型和已用重试次数。诊断不会显示频道 URL、查询参数或请求头。`MEDIA_ERR_SRC_NOT_SUPPORTED` 只表示当前目标无法打开该媒体，不等同于服务器不可访问；Simulator 上的 MPEG-TS、HEVC 等错误仍需在真机复现。
 
 以下请求选项可按数据源需要添加，最终会传给浏览器的 `fetch`：
 

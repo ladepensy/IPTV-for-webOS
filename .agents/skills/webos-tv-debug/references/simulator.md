@@ -1,8 +1,26 @@
 # Simulator workflow
 
+Read `privacy.md` before discovering a Simulator path or inspecting its GUI.
+
+## Discover safely
+
+Do not assume an absolute path from documentation, another computer, or prior conversation. First try the CLI's configured Simulator locations:
+
+```bash
+ares-launch --simulator 25 /absolute/path/to/app
+```
+
+If the CLI cannot find the requested version, inspect user-provided roots and bounded platform application locations by name only. On macOS, prefer Spotlight metadata over recursive home-directory scans:
+
+```bash
+mdfind 'kMDItemFSName == "*webOS*Simulator*.app"c'
+```
+
+When multiple versions match, select the requested version or ask the user. Use an explicit path only after verifying that it contains the Simulator application.
+
 ## Launch
 
-Validate the project first. A Simulator launch uses source files directly; it does not require an IPK.
+Validate the project first. A Simulator launch uses source files directly; it does not require an IPK. State that the app may contact its configured playlist and media endpoints, without printing those endpoints.
 
 ```bash
 ares-launch --simulator 25 /absolute/path/to/app
@@ -20,7 +38,7 @@ The explicit path is the extracted Simulator directory containing the platform-s
 
 ## Verify
 
-Do not stop at the CLI message. Verify that:
+Do not stop at the CLI message. Prefer process and accessibility evidence. Before taking a screenshot, follow the notice and minimization rules in `privacy.md`. Verify that:
 
 1. The Simulator process exists.
 2. Its process arguments contain the intended app directory.
