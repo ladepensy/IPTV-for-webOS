@@ -10,6 +10,8 @@
   var STALL_TIMEOUT_MS = getNumberOption(playbackConfig.stallTimeoutMs, 12000, 5000, 60000);
   var MAX_PLAYBACK_RETRIES = getNumberOption(playbackConfig.maxRetries, 2, 0, 5);
   var RETRY_DELAY_MS = getNumberOption(playbackConfig.retryDelayMs, 1200, 0, 10000);
+  var UI_HIDE_DELAY_MS = 5000;
+  var LAST_CHANNEL_STORAGE_KEY = "home-iptv:last-channel";
   var channels = [];
   var focusedIndex = 0;
   var playingIndex = -1;
@@ -23,7 +25,12 @@
   var wheelAccumulator = 0;
   var lastWheelEventAt = 0;
   var lastWheelStepAt = 0;
+  var uiHideTimer = null;
+  var isChannelPanelOpen = false;
+  var lastPointerActivityAt = 0;
 
+  var uiLayer = document.getElementById("ui-layer");
+  var channelPanel = document.getElementById("channel-panel");
   var channelList = document.getElementById("channel-list");
   var channelCount = document.getElementById("channel-count");
   var currentTitle = document.getElementById("current-title");
@@ -40,6 +47,118 @@
     var parsed = Number(value);
     if (!isFinite(parsed)) return fallback;
     return Math.max(minimum, Math.min(maximum, Math.round(parsed)));
+  }
+
+  function getPlaylistKey(value) {
+    var hash = 0;
+    var text = String(value || "");
+    var index;
+
+    for (index = 0; index < text.length; index += 1) {
+      hash = (hash * 31 + text.charCodeAt(index)) | 0;
+    }
+
+    return String(hash >>> 0);
+  }
+
+  function getInitialChannelIndex() {
+    var saved;
+    var matchedIndex = -1;
+
+    try {
+      saved = JSON.parse(window.localStorage.getItem(LAST_CHANNEL_STORAGE_KEY) || "null");
+    } catch (error) {
+      saved = null;
+    }
+
+    if (!saved || saved.playlistKey !== getPlaylistKey(PLAYLIST_URL)) return 0;
+
+    if (saved.channelId) {
+      channels.some(function (channel, index) {
+        if (channel.id === saved.channelId) {
+          matchedIndex = index;
+          return true;
+        }
+        return false;
+      });
+    }
+
+    if (matchedIndex < 0 && saved.name) {
+      channels.some(function (channel, index) {
+        if (channel.name === saved.name && channel.group === saved.group) {
+          matchedIndex = index;
+          return true;
+        }
+        return false;
+      });
+    }
+
+    if (matchedIndex < 0 && Number(saved.index) >= 0 && Number(saved.index) < channels.length) {
+      matchedIndex = Number(saved.index);
+    }
+
+    return matchedIndex >= 0 ? matchedIndex : 0;
+  }
+
+  function rememberChannel(channel, index) {
+    if (!channel) return;
+
+    try {
+      window.localStorage.setItem(
+        LAST_CHANNEL_STORAGE_KEY,
+        JSON.stringify({
+          playlistKey: getPlaylistKey(PLAYLIST_URL),
+          channelId: channel.id || "",
+          name: channel.name,
+          group: channel.group,
+          index: index
+        })
+      );
+    } catch (error) {
+      // Playback remains usable when storage is unavailable or full.
+    }
+  }
+
+  function isUiVisible() {
+    return !uiLayer.classList.contains("is-hidden");
+  }
+
+  function showUi() {
+    uiLayer.classList.remove("is-hidden");
+  }
+
+  function closeChannelPanel() {
+    isChannelPanelOpen = false;
+    channelPanel.classList.remove("is-open");
+    channelPanel.setAttribute("aria-hidden", "true");
+  }
+
+  function hideUi() {
+    clearTimeout(uiHideTimer);
+    uiHideTimer = null;
+    closeChannelPanel();
+    uiLayer.classList.add("is-hidden");
+  }
+
+  function scheduleUiHide() {
+    clearTimeout(uiHideTimer);
+    uiHideTimer = setTimeout(hideUi, UI_HIDE_DELAY_MS);
+  }
+
+  function openChannelPanel() {
+    showUi();
+    isChannelPanelOpen = true;
+    channelPanel.classList.add("is-open");
+    channelPanel.setAttribute("aria-hidden", "false");
+
+    if (playingIndex >= 0) focusedIndex = playingIndex;
+    updateFocus(true);
+    scheduleUiHide();
+  }
+
+  function noteUserActivity() {
+    showUi();
+    scheduleUiHide();
   }
 
   function parseAttributes(line) {
@@ -223,16 +342,6 @@
     retryTimer = null;
   }
 
-  function stopPlayback() {
-    playbackAttemptId += 1;
-    clearPlaybackTimers();
-    playbackHasStarted = false;
-    failedAttemptId = -1;
-    player.pause();
-    player.removeAttribute("src");
-    player.load();
-  }
-
   function scheduleStallTimeout() {
     clearTimeout(stallTimer);
     if (!playbackHasStarted) return;
@@ -331,16 +440,19 @@
       item.appendChild(number);
       item.appendChild(copy);
       item.addEventListener("mouseenter", function () {
+        noteUserActivity();
         focusedIndex = index;
         updateFocus(false);
       });
       item.addEventListener("focus", function () {
+        noteUserActivity();
         focusedIndex = index;
         updateFocus(false);
       });
       item.addEventListener("click", function () {
+        noteUserActivity();
         focusedIndex = index;
-        playFocusedChannel();
+        playFocusedChannel(true);
       });
       fragment.appendChild(item);
     });
@@ -370,7 +482,7 @@
     updateFocus(true);
   }
 
-  function playFocusedChannel() {
+  function playFocusedChannel(shouldClosePanel) {
     var channel = channels[focusedIndex];
     if (!channel) return;
 
@@ -380,8 +492,13 @@
     currentTitle.textContent = channel.name;
     nowPlayingTitle.textContent = channel.name;
     nowPlayingGroup.textContent = channel.group;
+    rememberChannel(channel, playingIndex);
     updateFocus();
     startPlaybackAttempt();
+
+    showUi();
+    if (shouldClosePanel) closeChannelPanel();
+    scheduleUiHide();
   }
 
   function loadPlaylist() {
@@ -412,10 +529,11 @@
           throw new Error("播放列表中没有频道");
         }
 
-        currentTitle.textContent = "选择一个频道";
-        setPlayerStatus("按方向键选择频道，按 OK 播放");
         setConnectionState("已连接", "is-online");
         renderChannels();
+        focusedIndex = getInitialChannelIndex();
+        playFocusedChannel(false);
+        openChannelPanel();
       })
       .catch(function (error) {
         currentTitle.textContent = "播放列表加载失败";
@@ -425,14 +543,15 @@
   }
 
   function handleBack() {
-    if (playingIndex >= 0) {
-      stopPlayback();
-      playingIndex = -1;
-      playerPlaceholder.classList.remove("is-hidden");
-      setPlayerStatus("播放已停止");
-      nowPlayingTitle.textContent = "尚未选择频道";
-      nowPlayingGroup.textContent = "按方向键选择，按 OK 播放";
-      updateFocus();
+    if (isChannelPanelOpen) {
+      closeChannelPanel();
+      showUi();
+      scheduleUiHide();
+      return;
+    }
+
+    if (isUiVisible()) {
+      hideUi();
       return;
     }
 
@@ -444,25 +563,43 @@
   }
 
   document.addEventListener("keydown", function (event) {
+    if (event.keyCode !== 461 && event.keyCode !== 27) noteUserActivity();
+
     switch (event.keyCode) {
+      case 37:
+        event.preventDefault();
+        closeChannelPanel();
+        break;
+      case 39:
+        event.preventDefault();
+        openChannelPanel();
+        break;
       case 38:
         event.preventDefault();
+        if (!isChannelPanelOpen) openChannelPanel();
         moveFocus(-1);
         break;
       case 40:
         event.preventDefault();
+        if (!isChannelPanelOpen) openChannelPanel();
         moveFocus(1);
         break;
       case 13:
         event.preventDefault();
-        playFocusedChannel();
+        if (isChannelPanelOpen) {
+          playFocusedChannel(true);
+        } else {
+          openChannelPanel();
+        }
         break;
       case 33:
         event.preventDefault();
+        if (!isChannelPanelOpen) openChannelPanel();
         moveFocus(-8);
         break;
       case 34:
         event.preventDefault();
+        if (!isChannelPanelOpen) openChannelPanel();
         moveFocus(8);
         break;
       case 461:
@@ -478,6 +615,8 @@
   document.addEventListener("wheel", function (event) {
     if (!channels.length) return;
     event.preventDefault();
+    noteUserActivity();
+    if (!isChannelPanelOpen) openChannelPanel();
     var now = Date.now();
     if (now - lastWheelEventAt > 500 || (wheelAccumulator > 0 && event.deltaY < 0) || (wheelAccumulator < 0 && event.deltaY > 0)) {
       wheelAccumulator = 0;
@@ -490,6 +629,13 @@
     wheelAccumulator = 0;
     lastWheelStepAt = now;
   }, { passive: false });
+
+  document.addEventListener("mousemove", function () {
+    var now = Date.now();
+    if (now - lastPointerActivityAt < 250) return;
+    lastPointerActivityAt = now;
+    noteUserActivity();
+  });
 
   player.addEventListener("playing", function () {
     clearTimeout(startupTimer);

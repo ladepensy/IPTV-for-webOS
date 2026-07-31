@@ -1,6 +1,6 @@
 ---
 name: webos-tv-debug
-description: Run, inspect, deploy, and diagnose webOS TV web apps on LG webOS TV Simulators and Developer Mode televisions with privacy-safe environment discovery and redacted diagnostics. Use for ares CLI setup, Simulator discovery and explicit paths, appinfo validation, packaging and IPK installation, Developer Mode SSH/key setup, Web Inspector, screenshots, remote-control testing, or media failures such as MediaError code 4 and DEMUXER_ERROR_COULD_NOT_OPEN.
+description: Run, inspect, deploy, and diagnose webOS TV web apps on LG webOS TV Simulators and Developer Mode televisions with privacy-safe environment discovery, Windows Git Bash-first workflows, and redacted diagnostics. Use for ares CLI setup, Simulator discovery and explicit paths, appinfo validation, packaging and IPK installation, Developer Mode SSH/key setup, Web Inspector, screenshots, remote-control testing, or media failures such as MediaError code 4 and DEMUXER_ERROR_COULD_NOT_OPEN.
 ---
 
 # webOS TV Debug
@@ -12,7 +12,7 @@ Diagnose the target first, then use the smallest workflow that proves the reques
 1. **Mandatory privacy gate:** read `references/privacy.md` completely. Establish the allowed project, Simulator, device, log, screenshot, network, and artifact scope before inspecting or launching anything. Confirm that private URLs, configuration, credentials, device identifiers, logs, screenshots, and IPKs will stay local and redacted. If any item is unknown, pause and resolve it before continuing.
 2. Locate the app directory containing `appinfo.json` from the current working directory or workspace root. Preserve unrelated and untracked files. Never infer the app location from this Skill's own absolute path, and never reuse a remembered machine-specific path without verifying it locally.
 3. Run `scripts/check-webos-project.sh APP_DIR` before launch or deployment.
-4. If the host is Windows PowerShell, read `references/windows.md` for the host setup, CLI, download, path, and device-command conventions. Then select one path:
+4. If the host is Windows, read `references/windows.md`. Prefer **Git Bash for Windows** for project validation, bundled `.sh` scripts, webOS CLI commands, packaging, installation, and launch. Use PowerShell only for Windows-only process inspection, path discovery, or when Git Bash is unavailable. Never confuse the WSL launcher at `C:\Windows\System32\bash.exe` with Git Bash. Then select one path:
    - For Simulator work, read `references/simulator.md` and use `scripts/run-simulator.sh` when its arguments fit.
    - For a real TV, read `references/real-device.md`. Run `scripts/deploy-to-tv.sh` only when the user asked to install or launch on that TV.
    - For playback failures, also read `references/media-diagnostics.md` before changing application code.
@@ -43,6 +43,7 @@ Failure of any check is a hard stop. Do not continue by assumption, and do not c
 - Do not install, remove, or launch an app on a real TV unless the user requested that state change.
 - Keep Developer Mode port `9922` and user `prisoner` distinct from emulator defaults.
 - Prefer explicit `--simulator-path` when the Simulator is outside the SDK search directory.
+- On Windows, keep bundled `.sh` files LF-only and run them with the verified Git for Windows `bash.exe`. If Bash reports `$'\r'` or `set: -\r`, fix the repository-owned script line endings before retrying rather than repeatedly wrapping the script at runtime.
 
 ## Bundled scripts
 

@@ -15,23 +15,52 @@
 body {
   margin: 0;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 82% 15%, rgba(238, 62, 104, 0.18), transparent 32%),
-    linear-gradient(145deg, #0d1421 0%, #07090e 62%);
+  background: #000;
 }
 
 .app-shell {
-  display: grid;
-  grid-template-rows: 130px 1fr 70px;
+  position: relative;
   width: 100vw;
   height: 100vh;
-  padding: 32px 42px 22px;
+  overflow: hidden;
+  background: #000;
+}
+
+.player-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+#player {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.ui-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .topbar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  height: 122px;
+  padding: 26px 42px 20px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.82), transparent);
+  transition: opacity 220ms ease, transform 220ms ease;
 }
 
 h1,
@@ -83,25 +112,29 @@ h1 {
   color: #ff91aa;
 }
 
-.content {
+.channel-panel {
+  position: absolute;
+  top: 118px;
+  bottom: 108px;
+  left: 36px;
   display: grid;
-  grid-template-columns: 390px 1fr;
-  min-height: 0;
-  gap: 24px;
-}
-
-.channel-panel,
-.player-panel {
+  grid-template-rows: 65px 1fr;
+  width: 420px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 22px;
   background: var(--surface);
-  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(calc(-100% - 50px));
+  transition: opacity 220ms ease, transform 260ms ease;
 }
 
-.channel-panel {
-  display: grid;
-  grid-template-rows: 65px 1fr;
+.channel-panel.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
 }
 
 .panel-heading {
@@ -179,19 +212,6 @@ h1 {
   white-space: nowrap;
 }
 
-.player-panel {
-  position: relative;
-  min-width: 0;
-  background: #000;
-}
-
-#player {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #000;
-}
-
 .player-placeholder {
   position: absolute;
   inset: 0;
@@ -261,9 +281,9 @@ h1 {
 
 .now-playing {
   position: absolute;
-  right: 24px;
-  bottom: 22px;
-  left: 24px;
+  right: 42px;
+  bottom: 70px;
+  left: 42px;
   display: flex;
   align-items: end;
   justify-content: space-between;
@@ -272,6 +292,11 @@ h1 {
   border-radius: 15px;
   background: rgba(7, 9, 14, 0.78);
   backdrop-filter: blur(16px);
+  transition: left 260ms ease, opacity 220ms ease, transform 220ms ease;
+}
+
+.channel-panel.is-open + .now-playing {
+  left: 486px;
 }
 
 .now-playing h2 {
@@ -285,12 +310,34 @@ h1 {
 }
 
 footer {
+  position: absolute;
+  right: 0;
+  bottom: 18px;
+  left: 0;
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: center;
   gap: 34px;
   color: var(--muted);
   font-size: 15px;
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.ui-layer.is-hidden .topbar {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+.ui-layer.is-hidden .now-playing,
+.ui-layer.is-hidden footer {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.ui-layer.is-hidden .channel-panel {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(calc(-100% - 50px));
 }
 
 kbd {
@@ -308,16 +355,33 @@ kbd {
 }
 
 @media (max-width: 1280px) {
-  .app-shell {
-    grid-template-rows: 100px 1fr 55px;
-    padding: 22px 28px 15px;
-  }
-
-  .content {
-    grid-template-columns: 310px 1fr;
-  }
-
   h1 {
     font-size: 28px;
+  }
+
+  .topbar {
+    height: 98px;
+    padding: 18px 28px;
+  }
+
+  .channel-panel {
+    top: 96px;
+    bottom: 94px;
+    left: 26px;
+    width: 350px;
+  }
+
+  .now-playing {
+    right: 28px;
+    bottom: 60px;
+    left: 28px;
+  }
+
+  .channel-panel.is-open + .now-playing {
+    left: 400px;
+  }
+
+  footer {
+    bottom: 12px;
   }
 }
