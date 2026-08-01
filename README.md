@@ -8,7 +8,9 @@
 - 支持配置请求方法、请求头、凭据和请求体
 - 解析频道名称、分组和播放地址
 - 支持 M3U 中相对于播放列表地址的频道 URL
-- 播放器始终占满屏幕，启动播放时默认显示频道信息，频道列表以左侧浮层按需打开
+- 播放器始终占满屏幕，启动播放时默认显示频道信息，频道库以 M3U、分组、频道三级浮层按需打开
+- 三级频道库会随当前操作列向左移动，频道聚焦后自动显示当前及后续节目
+- 自动读取 M3U 首行 `x-tvg-url` 指向的 XMLTV 节目单，也支持通过配置覆盖 EPG 地址
 - 启动后自动播放上次选择的频道；没有有效记录时播放当前列表第一个频道
 - 5 秒没有遥控器或 Magic Remote 操作后自动隐藏界面，视频继续播放
 - 支持遥控器方向键、OK 和 Back
@@ -28,6 +30,7 @@
 ├── styles.css     # 电视端全局界面样式
 ├── features/
 │   └── channels/
+│       ├── channel-browser-state.js # M3U、分组、频道三级子状态机
 │       ├── channel-panel.js  # 频道列表渲染、焦点与输入适配
 │       └── channel-panel.css # 频道列表独立样式
 ├── interaction.js # 操作状态机与事件转换
@@ -97,6 +100,7 @@ ares-server . --open
 
 ```bash
 node tests/interaction.test.js
+node tests/channel-browser-state.test.js
 node tests/channel-panel.test.js
 ```
 
@@ -273,16 +277,16 @@ LG 官方文档：
 
 | 按键 | 行为 |
 | --- | --- |
-| 右 | 打开左侧频道列表 |
-| 左 | 收起频道列表 |
-| 上 / 下 | 信息界面或隐藏状态下直接换台；频道列表打开时只移动焦点 |
-| OK | 界面隐藏时先显示信息；播放失败或结束时直接重播；其他情况下打开列表或播放选中频道 |
+| 右 | 打开频道库；在频道库内依次进入 M3U、分组、频道列 |
+| 左 | 在频道库内返回上一列；从 M3U 列返回播放信息 |
+| 上 / 下 | 信息界面或隐藏状态下直接换台；频道库打开时在当前列移动焦点 |
+| OK | 界面隐藏时先显示信息；在 M3U/分组列进入下一列；在频道列播放选中频道 |
 | Back | 信息或频道列表可见时隐藏界面；界面已经隐藏时弹出系统退出确认 |
 | Page Up / Page Down | 在电脑调试时快速跳过 8 个频道 |
 | Magic Remote 指针 | 悬停频道时同步焦点，点击播放 |
 | Magic Remote 滚轮 | 向上或向下移动一个频道 |
 
-界面隐藏时，导航上/下会直接换台并显示频道信息，右键会打开频道列表，其他普通按键和指针操作只显示信息界面；Back 会弹出系统退出确认。连续 5 秒没有操作后，顶部状态、频道列表、正在播放信息和操作提示都会隐藏，底层视频不会暂停或停止。播放失败或结束时，界面可见状态下按 OK 会优先直接重播当前频道。
+界面隐藏时，导航上/下会直接换台并显示频道信息，右键会打开频道库，其他普通按键和指针操作只显示信息界面；Back 会弹出系统退出确认。连续 5 秒没有操作后，顶部状态、频道库、正在播放信息和操作提示都会隐藏，底层视频不会暂停或停止。播放失败或结束时，频道库未打开且界面可见时按 OK 会优先直接重播当前频道；频道库打开时仍可正常进入分组或确认新频道。
 
 ## M3U 数据源配置
 
@@ -291,10 +295,14 @@ LG 官方文档：
 ```js
 window.IPTV_CONFIG = {
   playlist: {
+    name: "家庭 IPTV",
     url: "http://YOUR_M3U_SERVER/playlist.m3u",
     request: {
       method: "GET"
     }
+  },
+  epg: {
+    url: ""
   },
   playback: {
     startupTimeoutMs: 15000,
@@ -309,6 +317,8 @@ window.IPTV_CONFIG = {
   }
 };
 ```
+
+`epg.url` 留空时，应用会自动读取 `#EXTM3U` 首行的 `x-tvg-url`。rtp2httpd 常见的 `.xml.gz` 声明会自动切换到对应 XML 地址，并使用 XMLTV 的 `channel` / `display-name` 与 M3U 的 `tvg-id`、`tvg-name` 和频道名进行匹配。只有需要覆盖 M3U 声明时才填写 `epg.url`。
 
 `playback` 为可选播放配置：起播超过 `startupTimeoutMs`，或者已经播放后连续缓冲超过 `stallTimeoutMs`，应用会按 `retryDelayMs` 间隔重新加载当前频道，最多重试 `maxRetries` 次。`channelSwitchDelayMs` 用于合并连续上/下换台，`loadingIndicatorDelayMs` 控制普通换台多久后才显示紧凑 loading。切换频道或手动按 OK 会重置重试次数。
 
@@ -361,7 +371,6 @@ rtp2httpd 只是可选数据源之一。例如使用它时可以将 `url` 设置
 
 ## 已知限制
 
-- 当前版本尚未显示 EPG 节目单，只使用 M3U 频道信息。
 - 收藏和频道搜索尚未实现。
 - Simulator 的音视频支持与真机不同，IPTV 播放必须在 LG C5 上进行最终验证。
 

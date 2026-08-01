@@ -5,6 +5,9 @@
   var playlistConfig = config.playlist || {};
   var PLAYLIST_URL = playlistConfig.url || config.playlistUrl || "";
   var PLAYLIST_REQUEST = playlistConfig.request || config.playlistRequest || {};
+  var epgConfig = config.epg || {};
+  var EPG_URL = epgConfig.url || "";
+  var EPG_REQUEST = epgConfig.request || {};
   var playbackConfig = config.playback || {};
   var STARTUP_TIMEOUT_MS = getNumberOption(playbackConfig.startupTimeoutMs, 15000, 5000, 60000);
   var STALL_TIMEOUT_MS = getNumberOption(playbackConfig.stallTimeoutMs, 12000, 5000, 60000);
@@ -52,6 +55,8 @@
   var lastWheelEventAt = 0;
   var lastWheelStepAt = 0;
   var lastPointerActivityAt = 0;
+  var discoveredEpgUrl = "";
+  var epgProgramsByChannel = {};
 
   var uiLayer = document.getElementById("ui-layer");
   var currentTitle = document.getElementById("current-title");
@@ -62,11 +67,35 @@
   var playerDiagnostics = document.getElementById("player-diagnostics");
   var nowPlayingTitle = document.getElementById("now-playing-title");
   var nowPlayingGroup = document.getElementById("now-playing-group");
+  var nowPlayingProgramTitle = document.getElementById("now-playing-program-title");
+  var nowPlayingProgramTime = document.getElementById("now-playing-program-time");
+  var nowPlayingProgress = document.getElementById("now-playing-progress");
+  var nowPlayingProgressValue = document.getElementById("now-playing-progress-value");
+  var okHintLabel = document.getElementById("ok-hint-label");
   var clock = document.getElementById("clock");
   var channelPanelView = window.IPTVChannelPanel.create({
     panelElement: document.getElementById("channel-panel"),
-    listElement: document.getElementById("channel-list"),
+    trackElement: document.getElementById("channel-browser-track"),
+    sourceListElement: document.getElementById("source-list"),
+    groupListElement: document.getElementById("group-list"),
+    channelListElement: document.getElementById("channel-list"),
     countElement: document.getElementById("channel-count"),
+    columnTitleElement: document.getElementById("channel-column-title"),
+    epgElement: document.getElementById("epg-popover"),
+    epgTitleElement: document.getElementById("epg-channel-title"),
+    epgListElement: document.getElementById("epg-program-list"),
+    onSourceFocus: function (index) {
+      dispatch({ type: "SOURCE_FOCUS", index: index });
+    },
+    onSourceSelect: function (index) {
+      dispatch({ type: "SOURCE_SELECT", index: index });
+    },
+    onGroupFocus: function (index) {
+      dispatch({ type: "GROUP_FOCUS", index: index });
+    },
+    onGroupSelect: function (index) {
+      dispatch({ type: "GROUP_SELECT", index: index });
+    },
     onFocus: function (index) {
       dispatch({ type: "CHANNEL_FOCUS", index: index });
     },
@@ -161,18 +190,41 @@
     var panelIsOpen = state.uiMode === UI_MODE_CHANNELS;
     var uiIsHidden = state.uiMode === UI_MODE_HIDDEN;
     var playingChannel = state.channels[state.playingIndex];
+    var browserState = state.channelBrowser;
 
     uiLayer.classList.toggle("is-hidden", uiIsHidden);
     channelPanelView.render({
       open: panelIsOpen,
+      browserColumn: browserState.column,
+      sources: state.playlistSources,
       channels: state.channels,
-      focusedIndex: state.focusedIndex,
+      selectedGroup: browserState.selectedGroup,
+      focusedSourceIndex: browserState.focusedSourceIndex,
+      focusedGroupIndex: browserState.focusedGroupIndex,
+      focusedIndex: browserState.focusedChannelIndex,
       playingIndex: state.playingIndex,
+      programs: getChannelEpgPrograms(state.channels[browserState.focusedChannelIndex]),
       shouldScroll: panelIsOpen &&
         interaction.shouldScrollForEvent(event) &&
         (previousState.uiMode !== UI_MODE_CHANNELS ||
-          previousState.focusedIndex !== state.focusedIndex)
+          previousState.channelBrowser.focusedChannelIndex !==
+            browserState.focusedChannelIndex)
     });
+
+    if (panelIsOpen && browserState.column === 0) {
+      okHintLabel.textContent = "选择播放源";
+    } else if (panelIsOpen && browserState.column === 1) {
+      okHintLabel.textContent = "选择分组";
+    } else if (panelIsOpen) {
+      okHintLabel.textContent = "播放频道";
+    } else if (
+      state.playbackStatus === interaction.constants.PLAYBACK_FAILED ||
+      state.playbackStatus === interaction.constants.PLAYBACK_ENDED
+    ) {
+      okHintLabel.textContent = "重试";
+    } else {
+      okHintLabel.textContent = "播放";
+    }
 
     if (state.playlistStatus === "loading") {
       setConnectionState("连接中", "");
@@ -188,9 +240,11 @@
       currentTitle.textContent = playingChannel.name;
       nowPlayingTitle.textContent = playingChannel.name;
       nowPlayingGroup.textContent = playingChannel.group;
+      renderNowPlayingProgram(playingChannel);
     } else {
       currentTitle.textContent = state.titleMessage;
       nowPlayingTitle.textContent = state.titleMessage;
+      renderNowPlayingProgram(null);
     }
 
     if (
@@ -324,6 +378,15 @@
       var line = rawLine.trim();
       if (!line) return;
 
+      if (line.indexOf("#EXTM3U") === 0) {
+        var headerAttributes = parseAttributes(line);
+        var declaredEpgUrl = headerAttributes["x-tvg-url"] || headerAttributes["url-tvg"];
+        if (declaredEpgUrl) {
+          discoveredEpgUrl = resolveUrl(declaredEpgUrl.split(",")[0].trim(), baseUrl);
+        }
+        return;
+      }
+
       if (line.indexOf("#EXTINF:") === 0) {
         var commaIndex = line.indexOf(",");
         var metadata = commaIndex >= 0 ? line.slice(0, commaIndex) : line;
@@ -382,6 +445,169 @@
     });
 
     return options;
+  }
+
+  function buildEpgRequestOptions() {
+    var options = {
+      method: (EPG_REQUEST.method || "GET").toUpperCase(),
+      cache: EPG_REQUEST.cache || "no-store"
+    };
+    ["headers", "body", "credentials", "mode", "redirect", "referrer", "referrerPolicy"]
+      .forEach(function (field) {
+        if (EPG_REQUEST[field] !== undefined) options[field] = EPG_REQUEST[field];
+      });
+    return options;
+  }
+
+  function parseXmltvTime(value) {
+    var match = String(value || "").match(
+      /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?(?:\s*([+-])(\d{2})(\d{2}))?/
+    );
+    if (!match) return null;
+    var utc = Date.UTC(
+      Number(match[1]), Number(match[2]) - 1, Number(match[3]),
+      Number(match[4]), Number(match[5]), Number(match[6] || 0)
+    );
+    if (match[7]) {
+      var offset = (Number(match[8]) * 60 + Number(match[9])) * 60000;
+      utc += match[7] === "+" ? -offset : offset;
+    }
+    return new Date(utc);
+  }
+
+  function addEpgProgram(key, program) {
+    var normalized = String(key || "").trim().toLowerCase();
+    if (!normalized) return;
+    if (!epgProgramsByChannel[normalized]) epgProgramsByChannel[normalized] = [];
+    epgProgramsByChannel[normalized].push(program);
+  }
+
+  function parseXmltv(text) {
+    var documentNode = new DOMParser().parseFromString(text, "application/xml");
+    var parserError = documentNode.querySelector("parsererror");
+    if (parserError) throw new Error("EPG XML 格式无效");
+    var now = Date.now();
+    var horizon = now + 24 * 60 * 60 * 1000;
+    var channelAliases = {};
+    epgProgramsByChannel = {};
+
+    Array.prototype.forEach.call(documentNode.querySelectorAll("channel"), function (node) {
+      var id = String(node.getAttribute("id") || "").trim();
+      if (!id) return;
+      channelAliases[id] = [id];
+      Array.prototype.forEach.call(node.querySelectorAll("display-name"), function (nameNode) {
+        var alias = nameNode.textContent.trim();
+        if (alias && channelAliases[id].indexOf(alias) < 0) channelAliases[id].push(alias);
+      });
+    });
+
+    Array.prototype.forEach.call(documentNode.querySelectorAll("programme"), function (node) {
+      var start = parseXmltvTime(node.getAttribute("start"));
+      var stop = parseXmltvTime(node.getAttribute("stop"));
+      if (!start || !stop || stop.getTime() < now - 60 * 60 * 1000 || start.getTime() > horizon) return;
+      var titleNode = node.querySelector("title");
+      var channelId = node.getAttribute("channel");
+      var program = {
+        start: start,
+        stop: stop,
+        title: titleNode ? titleNode.textContent.trim() : "未命名节目"
+      };
+      (channelAliases[channelId] || [channelId]).forEach(function (key) {
+        addEpgProgram(key, program);
+      });
+    });
+
+    Object.keys(epgProgramsByChannel).forEach(function (key) {
+      epgProgramsByChannel[key].sort(function (left, right) {
+        return left.start.getTime() - right.start.getTime();
+      });
+    });
+  }
+
+  function getChannelEpgPrograms(channel) {
+    if (!channel) return [];
+    var keys = [channel.id, channel.name];
+    var result = [];
+    keys.some(function (key) {
+      var normalized = String(key || "").trim().toLowerCase();
+      if (normalized && epgProgramsByChannel[normalized]) {
+        result = epgProgramsByChannel[normalized];
+        return true;
+      }
+      return false;
+    });
+    return result;
+  }
+
+  function formatProgramTime(date) {
+    return String(date.getHours()).padStart(2, "0") +
+      ":" +
+      String(date.getMinutes()).padStart(2, "0");
+  }
+
+  function getCurrentProgram(channel, now) {
+    var currentTime = now.getTime();
+    var programs = getChannelEpgPrograms(channel);
+    for (var index = 0; index < programs.length; index += 1) {
+      if (
+        programs[index].start.getTime() <= currentTime &&
+        programs[index].stop.getTime() > currentTime
+      ) {
+        return programs[index];
+      }
+    }
+    return null;
+  }
+
+  function renderNowPlayingProgram(channel) {
+    var now = new Date();
+    var program = getCurrentProgram(channel, now);
+    var progress = 0;
+
+    if (program) {
+      var duration = program.stop.getTime() - program.start.getTime();
+      if (duration > 0) {
+        progress = Math.max(0, Math.min(100,
+          ((now.getTime() - program.start.getTime()) / duration) * 100
+        ));
+      }
+      nowPlayingProgramTitle.textContent = program.title;
+      nowPlayingProgramTime.textContent =
+        formatProgramTime(program.start) + " – " + formatProgramTime(program.stop);
+    } else {
+      nowPlayingProgramTitle.textContent = "暂无当前节目信息";
+      nowPlayingProgramTime.textContent = "";
+    }
+
+    nowPlayingProgress.setAttribute("aria-valuenow", String(Math.round(progress)));
+    nowPlayingProgressValue.style.width = progress.toFixed(1) + "%";
+  }
+
+  function loadEpg(url) {
+    if (!url) return;
+    var requestUrl = url.replace(/\.gz(?=($|\?))/i, "");
+    fetch(requestUrl, buildEpgRequestOptions())
+      .then(function (response) {
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        return response.text();
+      })
+      .then(function (text) {
+        parseXmltv(text);
+        renderState(state, { type: "EPG_READY" });
+      })
+      .catch(function () {
+        epgProgramsByChannel = {};
+      });
+  }
+
+  function getPlaylistDisplayName() {
+    if (playlistConfig.name) return playlistConfig.name;
+    try {
+      var parsed = new URL(PLAYLIST_URL);
+      return parsed.hostname || "当前 M3U";
+    } catch (error) {
+      return "当前 M3U";
+    }
   }
 
   function setConnectionState(label, stateClass) {
@@ -776,8 +1002,10 @@
         dispatch({
           type: "PLAYLIST_READY",
           channels: channels,
+          playlistName: getPlaylistDisplayName(),
           initialIndex: getInitialChannelIndex(channels)
         });
+        loadEpg(EPG_URL || discoveredEpgUrl);
       })
       .catch(function (error) {
         dispatch({
@@ -929,6 +1157,7 @@
       String(now.getHours()).padStart(2, "0") +
       ":" +
       String(now.getMinutes()).padStart(2, "0");
+    renderNowPlayingProgram(state.channels[state.playingIndex]);
   }
 
   renderState(state, { type: "INITIAL_RENDER" });

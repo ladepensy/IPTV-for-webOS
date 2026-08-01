@@ -41,7 +41,7 @@ assert.strictEqual(outcome.effects[0].type, "EXECUTE_PLAYBACK_ATTEMPT");
 
 outcome = send(state, { type: "KEY_DOWN", delta: 1, inputAt: 123 });
 state = outcome.state;
-assert.strictEqual(state.focusedIndex, 1);
+assert.strictEqual(state.channelBrowser.focusedChannelIndex, 1);
 assert.strictEqual(state.playingIndex, 1);
 assert.strictEqual(state.uiMode, constants.UI_MODE_INFO);
 assert.ok(outcome.effects.some(function (item) { return item.type === "SCHEDULE_PLAYBACK_SWITCH"; }));
@@ -52,8 +52,17 @@ assert.strictEqual(outcome.effects[0].inputAt, 123);
 
 state = send(state, { type: "KEY_RIGHT" }).state;
 assert.strictEqual(state.uiMode, constants.UI_MODE_CHANNELS);
+assert.strictEqual(state.channelBrowser.column, 0);
+assert.strictEqual(state.playlistSources.length, 1);
+state = send(state, { type: "KEY_RIGHT" }).state;
+assert.strictEqual(state.channelBrowser.column, 1);
 state = send(state, { type: "KEY_DOWN", delta: 1 }).state;
-assert.strictEqual(state.focusedIndex, 2);
+assert.strictEqual(state.channelBrowser.focusedGroupIndex, 1);
+state = send(state, { type: "KEY_RIGHT" }).state;
+assert.strictEqual(state.channelBrowser.column, 2);
+assert.strictEqual(state.channelBrowser.selectedGroup, "Test");
+state = send(state, { type: "KEY_DOWN", delta: 1 }).state;
+assert.strictEqual(state.channelBrowser.focusedChannelIndex, 2);
 assert.strictEqual(state.playingIndex, 1);
 
 outcome = send(state, { type: "KEY_OK" });
@@ -82,7 +91,7 @@ state.uiMode = constants.UI_MODE_HIDDEN;
 outcome = send(state, { type: "KEY_UP", delta: -1 });
 state = outcome.state;
 assert.strictEqual(state.uiMode, constants.UI_MODE_INFO);
-assert.strictEqual(state.focusedIndex, 1);
+assert.strictEqual(state.channelBrowser.focusedChannelIndex, 1);
 assert.strictEqual(state.playingIndex, 1);
 assert.ok(outcome.effects.some(function (item) { return item.type === "SCHEDULE_PLAYBACK_SWITCH"; }));
 
@@ -97,6 +106,15 @@ outcome = send(state, { type: "KEY_OK" });
 assert.strictEqual(outcome.state.playingIndex, 1);
 assert.strictEqual(outcome.state.playbackRetryCount, 0);
 assert.ok(outcome.effects.some(function (item) { return item.type === "START_PLAYBACK"; }));
+
+state = outcome.state;
+state.uiMode = constants.UI_MODE_CHANNELS;
+state.channelBrowser.column = 2;
+state.playbackStatus = constants.PLAYBACK_FAILED;
+state.channelBrowser.focusedChannelIndex = 2;
+outcome = send(state, { type: "KEY_OK" });
+assert.strictEqual(outcome.state.uiMode, constants.UI_MODE_INFO);
+assert.strictEqual(outcome.state.playingIndex, 2);
 
 state = outcome.state;
 state.playbackAttemptId = 5;

@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#080b12" />
     <title>Home IPTV</title>
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="features/channels/channel-panel.css" />
+    <link rel="stylesheet" href="styles.css?v=0.2.3" />
+    <link rel="stylesheet" href="features/channels/channel-panel.css?v=0.2.3" />
   </head>
   <body>
     <main class="app-shell">
@@ -36,19 +36,43 @@
           </div>
         </header>
 
-        <aside id="channel-panel" class="channel-panel" aria-label="频道列表" aria-hidden="true">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">频道库</p>
-              <strong>全部频道</strong>
-            </div>
-            <span id="channel-count" class="channel-count">0</span>
+        <aside id="channel-panel" class="channel-panel" aria-label="频道浏览器" aria-hidden="true">
+          <div id="channel-browser-track" class="channel-browser-track">
+            <section class="channel-column source-column" aria-label="M3U 播放源">
+              <div class="column-heading">
+                <p class="eyebrow">播放源</p>
+                <strong>M3U</strong>
+              </div>
+              <div id="source-list" class="browser-list" role="listbox"></div>
+            </section>
+
+            <section class="channel-column group-column" aria-label="频道分组">
+              <div class="column-heading">
+                <p class="eyebrow">频道分组</p>
+                <strong>选择分组</strong>
+              </div>
+              <div id="group-list" class="browser-list" role="listbox"></div>
+            </section>
+
+            <section class="channel-column channels-column" aria-label="频道">
+              <div class="column-heading">
+                <div>
+                  <p class="eyebrow">频道</p>
+                  <strong id="channel-column-title">全部</strong>
+                </div>
+                <span id="channel-count" class="channel-count">0</span>
+              </div>
+              <div id="channel-list" class="browser-list channel-list" role="listbox"></div>
+            </section>
+
+            <section id="epg-popover" class="epg-popover" aria-label="节目单" aria-live="polite">
+              <div class="epg-heading">
+                <p class="eyebrow">节目单</p>
+                <strong id="epg-channel-title">当前频道</strong>
+              </div>
+              <div id="epg-program-list" class="epg-program-list"></div>
+            </section>
           </div>
-          <div class="panel-toolbar">
-            <span>使用 ↑ ↓ 选择</span>
-            <span class="panel-live"><span class="status-dot" aria-hidden="true"></span>实时</span>
-          </div>
-          <div id="channel-list" class="channel-list" role="listbox"></div>
         </aside>
 
         <div class="now-playing">
@@ -56,6 +80,23 @@
             <p class="eyebrow">正在播放</p>
             <h2 id="now-playing-title">正在载入频道…</h2>
             <p id="now-playing-group">按 → 浏览频道库</p>
+            <div class="now-playing-program">
+              <div class="now-playing-program-line">
+                <span id="now-playing-program-title" class="now-playing-program-title">暂无当前节目信息</span>
+                <span id="now-playing-program-time" class="now-playing-program-time"></span>
+              </div>
+              <div
+                id="now-playing-progress"
+                class="now-playing-progress"
+                role="progressbar"
+                aria-label="当前节目进度"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="0"
+              >
+                <span id="now-playing-progress-value"></span>
+              </div>
+            </div>
           </div>
           <div class="now-playing-badge"><span class="live-pulse" aria-hidden="true"></span><span>LIVE</span></div>
         </div>
@@ -63,15 +104,16 @@
         <footer>
           <span class="hint"><kbd>→</kbd><span>频道库</span></span>
           <span class="hint"><kbd>↑</kbd><kbd>↓</kbd><span>换台 / 选择</span></span>
-          <span class="hint"><kbd>OK</kbd><span>播放</span></span>
+          <span class="hint"><kbd>OK</kbd><span id="ok-hint-label">播放</span></span>
           <span class="hint"><kbd>BACK</kbd><span>返回</span></span>
         </footer>
       </div>
     </main>
 
     <script src="config.js"></script>
-    <script src="interaction.js"></script>
-    <script src="features/channels/channel-panel.js"></script>
-    <script src="app.js"></script>
+    <script src="features/channels/channel-browser-state.js?v=0.2.1"></script>
+    <script src="interaction.js?v=0.2.1"></script>
+    <script src="features/channels/channel-panel.js?v=0.2.1"></script>
+    <script src="app.js?v=0.2.3"></script>
   </body>
 </html>

@@ -1,11 +1,16 @@
 (function (root, factory) {
   "use strict";
 
-  var api = factory();
+  var channelBrowserApi = typeof module === "object" && module.exports
+    ? require("./features/channels/channel-browser-state.js")
+    : root.IPTVChannelBrowserState;
+  var api = factory(channelBrowserApi);
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.IPTVInteraction = api;
-})(typeof window !== "undefined" ? window : this, function () {
+})(typeof window !== "undefined" ? window : this, function (channelBrowserApi) {
   "use strict";
+
+  if (!channelBrowserApi) throw new Error("IPTVChannelBrowserState is required");
 
   var constants = {
     UI_MODE_HIDDEN: "hidden",
@@ -29,7 +34,8 @@
         uiMode: constants.UI_MODE_INFO,
         playlistStatus: "loading",
         channels: [],
-        focusedIndex: 0,
+        playlistSources: [],
+        channelBrowser: channelBrowserApi.createInitialState(0),
         playingIndex: -1,
         playbackStatus: constants.PLAYBACK_IDLE,
         playbackAttemptId: 0,
@@ -47,6 +53,7 @@
       Object.keys(source).forEach(function (key) {
         result[key] = source[key];
       });
+      result.channelBrowser = channelBrowserApi.copyState(source.channelBrowser);
       return result;
     }
 
@@ -68,23 +75,34 @@
       return Math.max(0, Math.min(channels.length - 1, index));
     }
 
-    function openChannels(nextState) {
-      nextState.uiMode = constants.UI_MODE_CHANNELS;
-      if (nextState.playingIndex >= 0) {
-        nextState.focusedIndex = nextState.playingIndex;
-      }
+    function getBrowserContext(nextState) {
+      return {
+        channels: nextState.channels,
+        sources: nextState.playlistSources
+      };
     }
 
-    function moveChannelFocus(nextState, delta) {
-      nextState.focusedIndex = clampChannelIndex(
-        nextState.focusedIndex + delta,
-        nextState.channels
+    function updateChannelBrowser(nextState, event) {
+      var outcome = channelBrowserApi.transition(
+        nextState.channelBrowser,
+        event,
+        getBrowserContext(nextState)
       );
+      nextState.channelBrowser = outcome.state;
+      return outcome.action;
+    }
+
+    function openChannels(nextState) {
+      nextState.uiMode = constants.UI_MODE_CHANNELS;
+      updateChannelBrowser(nextState, {
+        type: "OPEN",
+        playingIndex: nextState.playingIndex
+      });
     }
 
     function selectChannel(nextState, index) {
       var selectedIndex = clampChannelIndex(index, nextState.channels);
-      nextState.focusedIndex = selectedIndex;
+      updateChannelBrowser(nextState, { type: "CHANNEL_FOCUS", index: selectedIndex });
       nextState.playingIndex = selectedIndex;
       nextState.uiMode = constants.UI_MODE_INFO;
       nextState.playbackStatus = constants.PLAYBACK_LOADING;
@@ -108,12 +126,23 @@
           break;
 
         case "KEY_LEFT":
-          next.uiMode = constants.UI_MODE_INFO;
+          if (next.uiMode === constants.UI_MODE_CHANNELS) {
+            var leftAction = updateChannelBrowser(next, { type: "LEFT" });
+            if (leftAction && leftAction.type === "CLOSE") {
+              next.uiMode = constants.UI_MODE_INFO;
+            }
+          } else {
+            next.uiMode = constants.UI_MODE_INFO;
+          }
           effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 
         case "KEY_RIGHT":
-          openChannels(next);
+          if (next.uiMode !== constants.UI_MODE_CHANNELS) {
+            openChannels(next);
+          } else {
+            updateChannelBrowser(next, { type: "RIGHT" });
+          }
           effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 
@@ -121,14 +150,14 @@
         case "KEY_DOWN":
           if (!next.channels.length) break;
           if (next.uiMode === constants.UI_MODE_CHANNELS) {
-            moveChannelFocus(next, event.delta);
+            updateChannelBrowser(next, { type: "MOVE", delta: event.delta });
             effects.push(effect("SCHEDULE_UI_HIDE"));
             break;
           }
 
           var currentPlayingIndex = next.playingIndex >= 0
             ? next.playingIndex
-            : next.focusedIndex;
+            : next.channelBrowser.focusedChannelIndex;
           var targetPlayingIndex = clampChannelIndex(
             currentPlayingIndex + event.delta,
             next.channels
@@ -154,7 +183,7 @@
           }
           if (!next.channels.length) break;
           if (next.uiMode !== constants.UI_MODE_CHANNELS) openChannels(next);
-          moveChannelFocus(next, event.delta);
+          updateChannelBrowser(next, { type: "MOVE", delta: event.delta });
           effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 
@@ -166,6 +195,7 @@
           }
 
           if (
+            next.uiMode !== constants.UI_MODE_CHANNELS &&
             (next.playbackStatus === constants.PLAYBACK_FAILED ||
               next.playbackStatus === constants.PLAYBACK_ENDED) &&
             next.playingIndex >= 0
@@ -181,12 +211,15 @@
           }
 
           if (next.uiMode === constants.UI_MODE_CHANNELS && next.channels.length) {
-            selectChannel(next, next.focusedIndex);
-            effects.push(effect("REMEMBER_CHANNEL"));
-            effects.push(effect("START_PLAYBACK", {
-              source: "remote-ok",
-              inputAt: event.inputAt
-            }));
+            var confirmAction = updateChannelBrowser(next, { type: "CONFIRM" });
+            if (confirmAction && confirmAction.type === "CHANNEL_SELECTED") {
+              selectChannel(next, confirmAction.index);
+              effects.push(effect("REMEMBER_CHANNEL"));
+              effects.push(effect("START_PLAYBACK", {
+                source: "remote-ok",
+                inputAt: event.inputAt
+              }));
+            }
             effects.push(effect("SCHEDULE_UI_HIDE"));
           } else if (next.channels.length) {
             openChannels(next);
@@ -227,14 +260,40 @@
           }
           if (!next.channels.length) break;
           if (next.uiMode !== constants.UI_MODE_CHANNELS) openChannels(next);
-          moveChannelFocus(next, event.delta);
+          updateChannelBrowser(next, { type: "MOVE", delta: event.delta });
+          effects.push(effect("SCHEDULE_UI_HIDE"));
+          break;
+
+        case "SOURCE_FOCUS":
+          if (!next.playlistSources[event.index]) break;
+          next.uiMode = constants.UI_MODE_CHANNELS;
+          updateChannelBrowser(next, { type: "SOURCE_FOCUS", index: event.index });
+          effects.push(effect("SCHEDULE_UI_HIDE"));
+          break;
+
+        case "SOURCE_SELECT":
+          if (!next.playlistSources[event.index]) break;
+          next.uiMode = constants.UI_MODE_CHANNELS;
+          updateChannelBrowser(next, { type: "SOURCE_SELECT", index: event.index });
+          effects.push(effect("SCHEDULE_UI_HIDE"));
+          break;
+
+        case "GROUP_FOCUS":
+          next.uiMode = constants.UI_MODE_CHANNELS;
+          updateChannelBrowser(next, { type: "GROUP_FOCUS", index: event.index });
+          effects.push(effect("SCHEDULE_UI_HIDE"));
+          break;
+
+        case "GROUP_SELECT":
+          next.uiMode = constants.UI_MODE_CHANNELS;
+          updateChannelBrowser(next, { type: "GROUP_SELECT", index: event.index });
           effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 
         case "CHANNEL_FOCUS":
           if (!next.channels[event.index]) break;
           next.uiMode = constants.UI_MODE_CHANNELS;
-          next.focusedIndex = event.index;
+          updateChannelBrowser(next, { type: "CHANNEL_FOCUS", index: event.index });
           effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 
@@ -264,7 +323,11 @@
         case "PLAYLIST_READY":
           next.playlistStatus = "ready";
           next.channels = event.channels;
-          next.focusedIndex = event.initialIndex;
+          next.playlistSources = event.sources || [{ name: event.playlistName || "当前 M3U" }];
+          updateChannelBrowser(next, {
+            type: "RESET",
+            initialChannelIndex: event.initialIndex
+          });
           selectChannel(next, event.initialIndex);
           effects.push(effect("REMEMBER_CHANNEL"));
           effects.push(effect("START_PLAYBACK"));

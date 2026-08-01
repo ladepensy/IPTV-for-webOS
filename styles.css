@@ -318,7 +318,7 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 88px;
+  min-height: 118px;
   padding: 20px 24px 20px 26px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 24px;
@@ -326,6 +326,11 @@ h1 {
   box-shadow: 0 18px 46px rgba(0, 0, 0, 0.28), inset 0 1px rgba(255, 255, 255, 0.08);
   transition: left 380ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease, transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
   backdrop-filter: blur(24px) saturate(145%);
+}
+
+.now-playing-copy {
+  flex: 1;
+  min-width: 0;
 }
 
 .now-playing::before {
@@ -341,7 +346,7 @@ h1 {
 
 .now-playing h2 {
   overflow: hidden;
-  max-width: 65vw;
+  max-width: 100%;
   margin-top: 7px;
   color: var(--ink);
   font-size: clamp(22px, 1.9vw, 30px);
@@ -357,8 +362,56 @@ h1 {
   font-size: 14px;
 }
 
+.now-playing-program {
+  max-width: 620px;
+  margin-top: 12px;
+}
+
+.now-playing-program-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+}
+
+.now-playing-program-title {
+  overflow: hidden;
+  color: rgba(247, 248, 252, 0.9);
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.now-playing-program-time {
+  flex: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.now-playing-progress {
+  overflow: hidden;
+  height: 4px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.now-playing-progress > span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+  transition: width 300ms ease;
+}
+
 .now-playing-badge {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 10px;
   min-height: 34px;

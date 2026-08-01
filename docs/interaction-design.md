@@ -26,7 +26,15 @@
 | `failed` | 自动重试已用尽 |
 | `ended` | 媒体正常结束 |
 
-`focusedIndex` 表示频道列表当前选择，`playingIndex` 表示播放器当前频道。移动焦点不会直接换台。
+`channelBrowser` 是频道库的嵌套子状态。它的 `column` 表示当前操作列：`0` 为 M3U、`1` 为分组、`2` 为频道；`focusedSourceIndex`、`focusedGroupIndex` 和 `focusedChannelIndex` 分别保存三列焦点，`selectedGroup` 保存已经确认进入的频道分组。主状态中的 `playingIndex` 表示播放器当前频道，移动子状态机焦点不会直接换台。
+
+频道库子状态机的 OK/确认结果分为三种：
+
+| 子状态结果 | 含义 | 是否触发播放 |
+| --- | --- | --- |
+| `SOURCE_SELECTED` | 确认当前 M3U，进入分组列 | 否 |
+| `GROUP_SELECTED` | 确认当前分组，筛选并进入频道列 | 否 |
+| `CHANNEL_SELECTED` | 确认当前频道，把频道索引交给主状态机 | 是 |
 
 在 `info` / `hidden` 中连续按上、下换台时，`playingIndex` 和屏幕频道信息会立即更新，但媒体副作用会合并：默认等待最后一次输入 220ms 后，只对最终频道执行一次 `pause → src → load → play`。频道列表中按 OK 或点击频道仍立即播放，不经过合并等待。
 
@@ -36,16 +44,16 @@
 
 | 输入 | `hidden` | `info` | `channels` |
 | --- | --- | --- | --- |
-| `←` | 显示信息 | 保持信息 | 关闭列表 |
-| `→` | 打开列表 | 打开列表 | 回到正在播放的频道 |
-| `↑ / ↓` | 直接换台并显示信息 | 直接换台 | 只移动焦点，不立即换台 |
-| `OK` | 显示信息 | 打开列表 | 播放选中频道并关闭列表 |
+| `←` | 显示信息 | 保持信息 | 返回上一列；M3U 列关闭频道库 |
+| `→` | 打开频道库 | 打开频道库 | 进入下一列；分组进入频道列时应用筛选 |
+| `↑ / ↓` | 直接换台并显示信息 | 直接换台 | 在当前列移动焦点，不立即换台 |
+| `OK` | 显示信息 | 打开频道库 | M3U/分组列进入下一列；频道列播放并关闭频道库 |
 | `Back` | 弹出系统退出确认 | 隐藏信息界面 | 隐藏信息和频道列表 |
 | 指针移动 | 显示信息 | 重置隐藏计时 | 重置隐藏计时 |
 | 滚轮 | 显示信息，不移动焦点 | 打开列表并选择 | 移动一项 |
 | 5 秒超时 | 保持隐藏 | 隐藏信息 | 隐藏信息和列表 |
 
-例外规则：当界面已经可见，且播放状态是 `failed` 或 `ended` 时，`OK` 优先直接重播当前频道。`hidden` 状态下第一次按 OK 只显示信息界面。
+例外规则：当频道库未打开、界面已经可见，且播放状态是 `failed` 或 `ended` 时，`OK` 优先直接重播当前频道；频道库打开时 `OK` 仍按当前列执行进入或选台。`hidden` 状态下第一次按 OK 只显示信息界面。
 
 Back 的层级固定为：`channels/info → hidden → 系统退出确认`。右键在任意状态下都可以进入 `channels`；`hidden` 下导航上/下会直接换台并显示 `info`，Back 直接进入系统退出流程，其他普通输入只负责唤醒 `info`。
 
@@ -59,17 +67,25 @@ Back 的层级固定为：`channels/info → hidden → 系统退出确认`。�
            dispatch(event)
                 ↓
        transition(state, event)
-          ↙               ↘
-   新的 state              effects
+          ↓                ↘
+ channelBrowser 子状态机     effects
+          ↓
+   新的 state
        ↓                     ↓
  renderState()        播放、计时、存储、退出
        ↓
  channelPanel.render()
 ```
 
-频道列表的 DOM 创建、开关状态、焦点样式、播放标记和滚动由
+M3U、分组和频道列的导航与确认由 `features/channels/channel-browser-state.js` 管理。主状态机只在收到 `CHANNEL_SELECTED` 时执行选台和播放副作用；`SOURCE_SELECTED` 与 `GROUP_SELECTED` 不会进入播放路径。
+
+三级频道库的 DOM 创建、列位移、焦点样式、播放标记、节目单浮窗和滚动由
 `features/channels/channel-panel.js` 独立负责。组件只接收状态快照，并把焦点和选择
 转换成回调；它不直接修改应用状态，也不控制播放器。
+
+频道库打开期间，底部 `now-playing` info 始终使用频道列聚焦状态下的固定左边界和宽度。播放源、分组、频道三列之间切换只移动频道库，不再改变 info 的长度。
+
+节目单默认从 M3U 首行 `x-tvg-url` 自动发现，也可由 `epg.url` 覆盖。XMLTV 加载后会把 `<channel>` 的 `id` 与 `display-name` 建立别名，再与 M3U 的 `tvg-id`、`tvg-name` 或频道名匹配。频道列获得焦点时浮窗自动显示当前及后续节目；没有匹配数据时显示空态，不阻断频道选择和播放。
 
 换台副作用分为即时播放和延迟提交两条路径。`START_PLAYBACK` 用于启动、重试和频道列表确认；`SCHEDULE_PLAYBACK_SWITCH` 用于信息/隐藏状态下的连续上、下换台。等待提交期间旧视频保持播放，播放器旧事件不会覆盖目标频道的状态。
 
