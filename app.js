@@ -542,78 +542,10 @@
     if (entries.length) sourceStore.rememberChannels(entries);
   }
 
-  function parseAttributes(line) {
-    var attributes = {};
-    var expression = /([\w-]+)="([^"]*)"/g;
-    var match;
-
-    while ((match = expression.exec(line)) !== null) {
-      attributes[match[1]] = match[2];
-    }
-
-    return attributes;
-  }
-
-  function resolveUrl(url, baseUrl) {
-    try {
-      return new URL(url, baseUrl).href;
-    } catch (error) {
-      return url;
-    }
-  }
-
   function parseM3U(text, baseUrl) {
-    var lines = text.split(/\r?\n/);
-    var channels = [];
-    var pending = null;
-
-    lines.forEach(function (rawLine) {
-      var line = rawLine.trim();
-      if (!line) return;
-
-      if (line.indexOf("#EXTM3U") === 0) {
-        var headerAttributes = parseAttributes(line);
-        var declaredEpgUrl = headerAttributes["x-tvg-url"] || headerAttributes["url-tvg"];
-        if (declaredEpgUrl) {
-          discoveredEpgUrl = resolveUrl(declaredEpgUrl.split(",")[0].trim(), baseUrl);
-        }
-        return;
-      }
-
-      if (line.indexOf("#EXTINF:") === 0) {
-        var commaIndex = line.indexOf(",");
-        var metadata = commaIndex >= 0 ? line.slice(0, commaIndex) : line;
-        var attributes = parseAttributes(metadata);
-
-        pending = {
-          id: attributes["tvg-id"] || "",
-          name:
-            (commaIndex >= 0 ? line.slice(commaIndex + 1).trim() : "") ||
-            attributes["tvg-name"] ||
-            "未命名频道",
-          logo: attributes["tvg-logo"] || "",
-          group: attributes["group-title"] || "其他",
-          url: ""
-        };
-        return;
-      }
-
-      if (line.charAt(0) !== "#") {
-        var channel = pending || {
-          id: "",
-          name: "频道 " + String(channels.length + 1).padStart(3, "0"),
-          logo: "",
-          group: "其他",
-          url: ""
-        };
-
-        channel.url = resolveUrl(line, baseUrl);
-        channels.push(channel);
-        pending = null;
-      }
-    });
-
-    return channels;
+    var result = window.IPTVCore.parseM3U(text, baseUrl);
+    discoveredEpgUrl = result.epgUrl;
+    return result.channels;
   }
 
   function buildPlaylistRequestOptions(requestConfig) {
@@ -654,69 +586,8 @@
     return options;
   }
 
-  function parseXmltvTime(value) {
-    var match = String(value || "").match(
-      /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?(?:\s*([+-])(\d{2})(\d{2}))?/
-    );
-    if (!match) return null;
-    var utc = Date.UTC(
-      Number(match[1]), Number(match[2]) - 1, Number(match[3]),
-      Number(match[4]), Number(match[5]), Number(match[6] || 0)
-    );
-    if (match[7]) {
-      var offset = (Number(match[8]) * 60 + Number(match[9])) * 60000;
-      utc += match[7] === "+" ? -offset : offset;
-    }
-    return new Date(utc);
-  }
-
-  function addEpgProgram(key, program) {
-    var normalized = String(key || "").trim().toLowerCase();
-    if (!normalized) return;
-    if (!epgProgramsByChannel[normalized]) epgProgramsByChannel[normalized] = [];
-    epgProgramsByChannel[normalized].push(program);
-  }
-
   function parseXmltv(text) {
-    var documentNode = new DOMParser().parseFromString(text, "application/xml");
-    var parserError = documentNode.querySelector("parsererror");
-    if (parserError) throw new Error("EPG XML 格式无效");
-    var now = Date.now();
-    var horizon = now + 24 * 60 * 60 * 1000;
-    var channelAliases = {};
-    epgProgramsByChannel = {};
-
-    Array.prototype.forEach.call(documentNode.querySelectorAll("channel"), function (node) {
-      var id = String(node.getAttribute("id") || "").trim();
-      if (!id) return;
-      channelAliases[id] = [id];
-      Array.prototype.forEach.call(node.querySelectorAll("display-name"), function (nameNode) {
-        var alias = nameNode.textContent.trim();
-        if (alias && channelAliases[id].indexOf(alias) < 0) channelAliases[id].push(alias);
-      });
-    });
-
-    Array.prototype.forEach.call(documentNode.querySelectorAll("programme"), function (node) {
-      var start = parseXmltvTime(node.getAttribute("start"));
-      var stop = parseXmltvTime(node.getAttribute("stop"));
-      if (!start || !stop || stop.getTime() < now - 60 * 60 * 1000 || start.getTime() > horizon) return;
-      var titleNode = node.querySelector("title");
-      var channelId = node.getAttribute("channel");
-      var program = {
-        start: start,
-        stop: stop,
-        title: titleNode ? titleNode.textContent.trim() : "未命名节目"
-      };
-      (channelAliases[channelId] || [channelId]).forEach(function (key) {
-        addEpgProgram(key, program);
-      });
-    });
-
-    Object.keys(epgProgramsByChannel).forEach(function (key) {
-      epgProgramsByChannel[key].sort(function (left, right) {
-        return left.start.getTime() - right.start.getTime();
-      });
-    });
+    epgProgramsByChannel = window.IPTVCore.parseXmltv(text);
   }
 
   function getChannelEpgPrograms(channel) {

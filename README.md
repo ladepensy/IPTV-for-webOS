@@ -29,19 +29,21 @@
 ```text
 .
 ├── appinfo.json   # webOS 应用清单
-├── index.html     # 应用页面
+├── index.html     # Vite 应用入口和播放器外壳
 ├── styles.css     # 电视端全局界面样式
+├── src/
+│   ├── core/      # TypeScript：M3U、XMLTV、播放源和频道浏览状态
+│   ├── ui/        # React：频道库和播放源表单
+│   └── main.tsx   # 新核心、React UI 与旧播放控制器的兼容装配
 ├── features/
 │   ├── channels/
-│   │   ├── channel-browser-state.js # M3U、分组、频道三级子状态机
-│   │   ├── channel-panel.js  # 频道列表渲染、焦点与输入适配
-│   │   └── channel-panel.css # 频道列表独立样式
+│   │   └── channel-panel.css # 频道列表样式
 │   └── sources/
-│       ├── source-store.js # 播放源持久化、迁移与数量限制
-│       ├── source-form.js  # 添加、编辑和删除播放源交互
 │       └── source-form.css # 播放源表单样式
 ├── interaction.js # 操作状态机与事件转换
-├── app.js         # M3U、全局渲染和播放副作用
+├── app.js         # 保留的 HTMLVideoElement 播放与 webOS 副作用
+├── vite.config.ts # Web 构建和 webOS 资源复制
+├── dist/          # pnpm build 生成的 webOS 可运行目录（不提交）
 ├── docs/interaction-design.md # 操作状态与事件转换规范
 ├── config.example.js # 脱敏的本地配置模板
 ├── icon.png
@@ -72,6 +74,16 @@ ares-launch --version
 
 ## 本地预览
 
+安装项目依赖：
+
+```bash
+corepack enable
+corepack install
+pnpm install
+```
+
+如果当前终端仍提示找不到 `pnpm`，关闭并重新打开 PowerShell 后再执行上述命令。
+
 先创建仅供本机使用的配置文件：
 
 ```bash
@@ -95,40 +107,44 @@ window.IPTV_CONFIG = {
 
 `config.js` 已加入 `.gitignore`，不会被 Git 跟踪。不要把私人服务器地址写进源码、README 或示例配置。
 
-安装 webOS CLI 后，在项目目录运行：
+开发服务器会自动读取存在于项目根目录的本地 `config.js`：
 
 ```bash
-ares-server . --open
+pnpm dev
 ```
 
 普通浏览器适合检查布局、M3U 解析和基本交互。遥控器焦点与部分 webOS 行为应在 Simulator 中验证；实际解码、换台和长时间播放必须在真机上验证。
 
-状态机逻辑可以直接运行本地测试：
+运行 TypeScript 核心测试、旧状态机回归测试和生产构建：
 
 ```bash
+pnpm test
 node tests/interaction.test.js
 node tests/channel-browser-state.test.js
 node tests/channel-panel.test.js
 node tests/source-store.test.js
 node tests/source-form.test.js
+pnpm build
 ```
+
+`pnpm build` 会生成 `dist/`。出于隐私保护，构建只写入空的安全配置，不会自动把本地 `config.js` 复制进分发目录；没有预置源时，应用会在电视端打开播放源表单。
 
 ## Simulator 调试
 
 ### 启动应用
 
-在项目根目录可以使用仓库自带脚本一键校验并启动 Simulator。
+先运行 `pnpm build`，再使用仓库脚本校验并启动生成的 `dist/` 应用。
 
 Windows 使用 PowerShell 7：
 
 ```powershell
-& .\.agents\skills\webos-tv-debug\scripts\run-simulator.ps1 -Version 25 -AppDir .
+& .\.agents\skills\webos-tv-debug\scripts\run-simulator.ps1 -Version 25 -AppDir .\dist
 ```
 
 macOS 使用终端：
 
 ```bash
-./.agents/skills/webos-tv-debug/scripts/run-simulator.sh 25 "$(pwd -P)"
+./.agents/skills/webos-tv-debug/scripts/run-simulator.sh 25 "$(pwd -P)/dist"
 ```
 
 如果 Simulator 不在 webOS CLI 默认搜索目录，Windows 增加 `-SimulatorDir $env:WEBOS_SIMULATOR_DIR`，macOS 在命令末尾增加 `"$WEBOS_SIMULATOR_DIR"`。变量应指向包含 Simulator 可执行程序的已解压目录。
@@ -249,13 +265,13 @@ ares-device --system-info --device myTV
 Windows 使用 PowerShell 7：
 
 ```powershell
-& .\.agents\skills\webos-tv-debug\scripts\deploy-to-tv.ps1 -Device myTV -AppDir .
+& .\.agents\skills\webos-tv-debug\scripts\deploy-to-tv.ps1 -Device myTV -AppDir .\dist
 ```
 
 macOS 使用终端：
 
 ```bash
-./.agents/skills/webos-tv-debug/scripts/deploy-to-tv.sh myTV "$(pwd -P)"
+./.agents/skills/webos-tv-debug/scripts/deploy-to-tv.sh myTV "$(pwd -P)/dist"
 ```
 
 需要同时打开 Inspector 时，Windows 在命令末尾增加 `-Inspect`，macOS 增加 `--inspect`。部署脚本使用临时目录生成 IPK，不会为了覆盖安装而修改本地 `appinfo.json` 版本号。
@@ -264,7 +280,7 @@ macOS 使用终端：
 
 ```bash
 # 打包
-ares-package .
+ares-package dist
 
 # 安装；myTV 替换为注册时设置的设备名
 ares-install --device myTV com.odyssey.webos.iptv_0.1.0_all.ipk
@@ -273,7 +289,7 @@ ares-install --device myTV com.odyssey.webos.iptv_0.1.0_all.ipk
 ares-launch --device myTV com.odyssey.webos.iptv
 ```
 
-`config.js` 会被打进 IPK，并在电视端尚未初始化播放源时作为首次导入配置。安装前应确认其中使用的是电视能够访问的局域网地址，而不是 `localhost` 或 `127.0.0.1`。生成的 `*.ipk` 和本地 `config.js` 均已被 `.gitignore` 忽略。
+默认构建不会把私人 `config.js` 打进 IPK，首次启动时可直接在电视端添加播放源。如果确实需要预置源，应在本机完成构建后自行将配置放入 `dist/config.js`，确认目标地址可由电视访问，并且不要提交或分享该目录及其 IPK。生成的 `*.ipk`、`dist/` 和本地 `config.js` 均已被 `.gitignore` 忽略。
 
 代码修改后，重新执行打包、安装和启动命令即可覆盖开发版本。
 

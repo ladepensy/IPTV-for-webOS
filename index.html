@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#080b12" />
     <title>IPTV for webOS</title>
-    <link rel="stylesheet" href="styles.css?v=0.2.3" />
-    <link rel="stylesheet" href="features/channels/channel-panel.css?v=0.3.0" />
-    <link rel="stylesheet" href="features/sources/source-form.css?v=0.1.0" />
   </head>
   <body>
     <main class="app-shell">
@@ -109,38 +106,10 @@
           <span class="hint"><kbd>BACK</kbd><span>返回</span></span>
         </footer>
 
-        <section id="source-form-overlay" class="source-form-overlay" aria-label="播放源设置" aria-hidden="true">
-          <div class="source-form-card">
-            <p class="eyebrow">播放源</p>
-            <h2 id="source-form-title">添加播放源</h2>
-            <p id="source-form-subtitle" class="source-form-subtitle">添加一个电视可访问的 M3U 地址</p>
-            <div class="source-form-fields">
-              <label class="source-field">
-                <span>名称（可选）</span>
-                <input id="source-name-input" type="text" maxlength="60" autocomplete="off" placeholder="例如：家庭 IPTV" />
-              </label>
-              <label class="source-field">
-                <span>M3U 地址（必填）</span>
-                <input id="source-url-input" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://server/playlist.m3u" />
-              </label>
-            </div>
-            <p id="source-form-error" class="source-form-error" role="alert" hidden></p>
-            <div class="source-form-actions">
-              <button id="source-save-button" class="source-form-button is-primary" type="button">添加并播放</button>
-              <button id="source-cancel-button" class="source-form-button" type="button">取消</button>
-              <button id="source-delete-button" class="source-form-button is-danger" type="button" hidden>删除播放源</button>
-            </div>
-          </div>
-        </section>
+        <section id="source-form-overlay" class="source-form-overlay" aria-label="播放源设置" aria-hidden="true"></section>
       </div>
     </main>
 
-    <script src="config.js"></script>
-    <script src="features/sources/source-store.js?v=0.1.0"></script>
-    <script src="features/sources/source-form.js?v=0.1.0"></script>
-    <script src="features/channels/channel-browser-state.js?v=0.3.0"></script>
-    <script src="interaction.js?v=0.3.0"></script>
-    <script src="features/channels/channel-panel.js?v=0.3.0"></script>
-    <script src="app.js?v=0.3.0"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
