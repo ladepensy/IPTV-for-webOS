@@ -10,23 +10,50 @@
   var STALL_TIMEOUT_MS = getNumberOption(playbackConfig.stallTimeoutMs, 12000, 5000, 60000);
   var MAX_PLAYBACK_RETRIES = getNumberOption(playbackConfig.maxRetries, 2, 0, 5);
   var RETRY_DELAY_MS = getNumberOption(playbackConfig.retryDelayMs, 1200, 0, 10000);
+  var CHANNEL_SWITCH_DELAY_MS = getNumberOption(
+    playbackConfig.channelSwitchDelayMs,
+    220,
+    100,
+    1000
+  );
+  var LOADING_INDICATOR_DELAY_MS = getNumberOption(
+    playbackConfig.loadingIndicatorDelayMs,
+    500,
+    0,
+    2000
+  );
+  var uiConfig = config.ui || {};
   var UI_HIDE_DELAY_MS = 5000;
   var LAST_CHANNEL_STORAGE_KEY = "home-iptv:last-channel";
-  var channels = [];
-  var focusedIndex = 0;
-  var playingIndex = -1;
-  var playbackAttemptId = 0;
-  var playbackRetryCount = 0;
-  var playbackHasStarted = false;
+
+  var interaction = window.IPTVInteraction.create({
+    maxPlaybackRetries: MAX_PLAYBACK_RETRIES,
+    getStreamInfo: getStreamInfo
+  });
+  var UI_MODE_HIDDEN = interaction.constants.UI_MODE_HIDDEN;
+  var UI_MODE_CHANNELS = interaction.constants.UI_MODE_CHANNELS;
+  var PLAYBACK_PLAYING = interaction.constants.PLAYBACK_PLAYING;
+  var PLAYBACK_RETRYING = interaction.constants.PLAYBACK_RETRYING;
+  var state = interaction.createInitialState();
+
   var startupTimer = null;
   var stallTimer = null;
   var retryTimer = null;
-  var failedAttemptId = -1;
+  var channelSwitchTimer = null;
+  var loadingIndicatorTimer = null;
+  var loadingIndicatorAttemptId = -1;
+  var uiHideTimer = null;
+  var channelItems = [];
+  var renderedFocusedIndex = -1;
+  var renderedPlayingIndex = -1;
+  var activeMediaAttemptId = -1;
+  var activeMediaIndex = -1;
+  var hasPlayedMedia = false;
+  var pendingPlaybackMetric = null;
+  var activePlaybackMetric = null;
   var wheelAccumulator = 0;
   var lastWheelEventAt = 0;
   var lastWheelStepAt = 0;
-  var uiHideTimer = null;
-  var isChannelPanelOpen = false;
   var lastPointerActivityAt = 0;
 
   var uiLayer = document.getElementById("ui-layer");
@@ -49,6 +76,140 @@
     return Math.max(minimum, Math.min(maximum, Math.round(parsed)));
   }
 
+  function isWebOSRuntime() {
+    return Boolean(
+      window.PalmSystem ||
+      /(?:webos|web0s)/i.test(window.navigator && window.navigator.userAgent || "")
+    );
+  }
+
+  function shouldUseSimpleUi() {
+    if (uiConfig.simpleMode === true || uiConfig.simpleMode === "on") return true;
+    if (uiConfig.simpleMode === false || uiConfig.simpleMode === "off") return false;
+    return isWebOSRuntime();
+  }
+
+  if (shouldUseSimpleUi()) {
+    document.documentElement.classList.add("webos-simple-ui");
+  }
+
+  function dispatch(event) {
+    var previousState = state;
+    var transitionResult = interaction.transition(state, event);
+    state = transitionResult.state;
+    renderState(previousState, event);
+    transitionResult.effects.forEach(runEffect);
+  }
+
+  function runEffect(currentEffect) {
+    switch (currentEffect.type) {
+      case "SCHEDULE_UI_HIDE":
+        scheduleUiHide();
+        break;
+      case "CANCEL_UI_HIDE":
+        clearTimeout(uiHideTimer);
+        uiHideTimer = null;
+        break;
+      case "EXIT_APP":
+        exitApp();
+        break;
+      case "REMEMBER_CHANNEL":
+        rememberChannel(state.channels[state.playingIndex], state.playingIndex);
+        break;
+      case "SCHEDULE_PLAYBACK_SWITCH":
+        schedulePlaybackSwitch(currentEffect);
+        break;
+      case "START_PLAYBACK":
+        cancelPendingPlaybackSwitch();
+        beginPlaybackMetric(
+          currentEffect.source || "automatic",
+          currentEffect.inputAt
+        );
+        dispatch({
+          type: "START_PLAYBACK_ATTEMPT",
+          expectedPlayingIndex: state.playingIndex
+        });
+        break;
+      case "EXECUTE_PLAYBACK_ATTEMPT":
+        startPlaybackAttempt(currentEffect.attemptId, currentEffect.playingIndex);
+        break;
+      case "CLEAR_PLAYBACK_TIMERS":
+        clearPlaybackTimers();
+        break;
+      case "SCHEDULE_STALL_TIMEOUT":
+        scheduleStallTimeout(currentEffect.attemptId);
+        break;
+      case "SCHEDULE_PLAYBACK_RETRY":
+        schedulePlaybackRetry(currentEffect.attemptId, currentEffect.playingIndex);
+        break;
+      default:
+        break;
+    }
+  }
+
+  function renderState(previousState, event) {
+    var panelIsOpen = state.uiMode === UI_MODE_CHANNELS;
+    var uiIsHidden = state.uiMode === UI_MODE_HIDDEN;
+    var playingChannel = state.channels[state.playingIndex];
+
+    uiLayer.classList.toggle("is-hidden", uiIsHidden);
+    channelPanel.classList.toggle("is-open", panelIsOpen);
+    channelPanel.setAttribute("aria-hidden", panelIsOpen ? "false" : "true");
+
+    if (previousState.channels !== state.channels) renderChannels();
+    updateFocus(previousState, interaction.shouldScrollForEvent(event));
+
+    if (state.playlistStatus === "loading") {
+      setConnectionState("连接中", "");
+    } else if (state.playlistStatus === "ready") {
+      setConnectionState("已连接", "is-online");
+    } else if (state.playlistStatus === "unconfigured") {
+      setConnectionState("未配置", "is-error");
+    } else {
+      setConnectionState("连接失败", "is-error");
+    }
+
+    if (playingChannel) {
+      currentTitle.textContent = playingChannel.name;
+      nowPlayingTitle.textContent = playingChannel.name;
+      nowPlayingGroup.textContent = playingChannel.group;
+    } else {
+      currentTitle.textContent = state.titleMessage;
+      nowPlayingTitle.textContent = state.titleMessage;
+    }
+
+    if (
+      previousState.playerMessage !== state.playerMessage ||
+      previousState.playerDetails !== state.playerDetails
+    ) {
+      setPlayerStatus(state.playerMessage, state.playerDetails);
+    }
+
+    updatePlaybackOverlay(event);
+  }
+
+  function scheduleUiHide() {
+    clearTimeout(uiHideTimer);
+    uiHideTimer = setTimeout(function () {
+      uiHideTimer = null;
+      dispatch({ type: "UI_TIMEOUT" });
+    }, UI_HIDE_DELAY_MS);
+  }
+
+  function exitApp() {
+    if (window.webOS && typeof window.webOS.platformBack === "function") {
+      window.webOS.platformBack();
+      return;
+    }
+
+    if (window.PalmSystem && typeof window.PalmSystem.platformBack === "function") {
+      window.PalmSystem.platformBack();
+      return;
+    }
+
+    window.close();
+  }
+
   function getPlaylistKey(value) {
     var hash = 0;
     var text = String(value || "");
@@ -61,7 +222,7 @@
     return String(hash >>> 0);
   }
 
-  function getInitialChannelIndex() {
+  function getInitialChannelIndex(channels) {
     var saved;
     var matchedIndex = -1;
 
@@ -119,48 +280,6 @@
     }
   }
 
-  function isUiVisible() {
-    return !uiLayer.classList.contains("is-hidden");
-  }
-
-  function showUi() {
-    uiLayer.classList.remove("is-hidden");
-  }
-
-  function closeChannelPanel() {
-    isChannelPanelOpen = false;
-    channelPanel.classList.remove("is-open");
-    channelPanel.setAttribute("aria-hidden", "true");
-  }
-
-  function hideUi() {
-    clearTimeout(uiHideTimer);
-    uiHideTimer = null;
-    closeChannelPanel();
-    uiLayer.classList.add("is-hidden");
-  }
-
-  function scheduleUiHide() {
-    clearTimeout(uiHideTimer);
-    uiHideTimer = setTimeout(hideUi, UI_HIDE_DELAY_MS);
-  }
-
-  function openChannelPanel() {
-    showUi();
-    isChannelPanelOpen = true;
-    channelPanel.classList.add("is-open");
-    channelPanel.setAttribute("aria-hidden", "false");
-
-    if (playingIndex >= 0) focusedIndex = playingIndex;
-    updateFocus(true);
-    scheduleUiHide();
-  }
-
-  function noteUserActivity() {
-    showUi();
-    scheduleUiHide();
-  }
-
   function parseAttributes(line) {
     var attributes = {};
     var expression = /([\w-]+)="([^"]*)"/g;
@@ -183,7 +302,7 @@
 
   function parseM3U(text, baseUrl) {
     var lines = text.split(/\r?\n/);
-    var result = [];
+    var channels = [];
     var pending = null;
 
     lines.forEach(function (rawLine) {
@@ -211,19 +330,19 @@
       if (line.charAt(0) !== "#") {
         var channel = pending || {
           id: "",
-          name: "频道 " + String(result.length + 1).padStart(3, "0"),
+          name: "频道 " + String(channels.length + 1).padStart(3, "0"),
           logo: "",
           group: "其他",
           url: ""
         };
 
         channel.url = resolveUrl(line, baseUrl);
-        result.push(channel);
+        channels.push(channel);
         pending = null;
       }
     });
 
-    return result;
+    return channels;
   }
 
   function buildPlaylistRequestOptions() {
@@ -263,6 +382,185 @@
     } else {
       playerDiagnostics.textContent = "";
       playerDiagnostics.hidden = true;
+    }
+  }
+
+  function getMonotonicTime() {
+    if (window.performance && typeof window.performance.now === "function") {
+      return window.performance.now();
+    }
+    return Date.now();
+  }
+
+  function roundDuration(value) {
+    return value === null || value === undefined
+      ? null
+      : Math.max(0, Math.round(value));
+  }
+
+  function publishPlaybackMetric(metric) {
+    var inputAt = metric.inputAt;
+    var sourceAssignedAt = metric.sourceAssignedAt;
+
+    window.__IPTV_PERFORMANCE__ = {
+      source: metric.source,
+      attemptId: metric.attemptId,
+      keyToRequestMs: inputAt === null
+        ? null
+        : roundDuration(metric.requestAt - inputAt),
+      keyToSourceMs: inputAt === null || sourceAssignedAt === null
+        ? null
+        : roundDuration(sourceAssignedAt - inputAt),
+      sourceToMetadataMs: sourceAssignedAt === null || metric.metadataAt === null
+        ? null
+        : roundDuration(metric.metadataAt - sourceAssignedAt),
+      sourceToCanPlayMs: sourceAssignedAt === null || metric.canPlayAt === null
+        ? null
+        : roundDuration(metric.canPlayAt - sourceAssignedAt),
+      sourceToPlayingMs: sourceAssignedAt === null || metric.playingAt === null
+        ? null
+        : roundDuration(metric.playingAt - sourceAssignedAt)
+    };
+  }
+
+  function beginPlaybackMetric(source, inputAt) {
+    pendingPlaybackMetric = {
+      source: source,
+      inputAt: typeof inputAt === "number" ? inputAt : null,
+      requestAt: getMonotonicTime(),
+      attemptId: null,
+      sourceAssignedAt: null,
+      metadataAt: null,
+      canPlayAt: null,
+      playingAt: null
+    };
+    publishPlaybackMetric(pendingPlaybackMetric);
+  }
+
+  function attachPlaybackMetric(attemptId) {
+    activePlaybackMetric = pendingPlaybackMetric || {
+      source: "retry",
+      inputAt: null,
+      requestAt: getMonotonicTime(),
+      attemptId: null,
+      sourceAssignedAt: null,
+      metadataAt: null,
+      canPlayAt: null,
+      playingAt: null
+    };
+    pendingPlaybackMetric = null;
+    activePlaybackMetric.attemptId = attemptId;
+    publishPlaybackMetric(activePlaybackMetric);
+  }
+
+  function recordPlaybackMetric(stage, attemptId) {
+    if (!activePlaybackMetric || activePlaybackMetric.attemptId !== attemptId) return;
+    if (stage === "source") activePlaybackMetric.sourceAssignedAt = getMonotonicTime();
+    if (stage === "metadata") activePlaybackMetric.metadataAt = getMonotonicTime();
+    if (stage === "canplay") activePlaybackMetric.canPlayAt = getMonotonicTime();
+    if (stage === "playing") activePlaybackMetric.playingAt = getMonotonicTime();
+    publishPlaybackMetric(activePlaybackMetric);
+  }
+
+  function cancelPendingPlaybackSwitch() {
+    clearTimeout(channelSwitchTimer);
+    channelSwitchTimer = null;
+  }
+
+  function schedulePlaybackSwitch(currentEffect) {
+    cancelPendingPlaybackSwitch();
+    clearPlaybackTimers();
+    if (hasPlayedMedia) hidePlaybackOverlay();
+    beginPlaybackMetric("remote-navigation", currentEffect.inputAt);
+
+    channelSwitchTimer = setTimeout(function () {
+      channelSwitchTimer = null;
+      if (state.playingIndex !== currentEffect.playingIndex) return;
+
+      if (
+        activeMediaIndex === currentEffect.playingIndex &&
+        activeMediaAttemptId === state.playbackAttemptId &&
+        player.readyState >= 2
+      ) {
+        pendingPlaybackMetric = null;
+        dispatch({
+          type: "PLAYBACK_PLAYING",
+          attemptId: activeMediaAttemptId
+        });
+        return;
+      }
+
+      pendingPlaybackMetric.requestAt = getMonotonicTime();
+      publishPlaybackMetric(pendingPlaybackMetric);
+      rememberChannel(state.channels[state.playingIndex], state.playingIndex);
+      dispatch({
+        type: "START_PLAYBACK_ATTEMPT",
+        expectedPlayingIndex: currentEffect.playingIndex
+      });
+    }, CHANNEL_SWITCH_DELAY_MS);
+  }
+
+  function clearLoadingIndicatorTimer() {
+    clearTimeout(loadingIndicatorTimer);
+    loadingIndicatorTimer = null;
+    loadingIndicatorAttemptId = -1;
+  }
+
+  function hidePlaybackOverlay() {
+    clearLoadingIndicatorTimer();
+    playerPlaceholder.classList.remove("is-compact");
+    playerPlaceholder.classList.add("is-hidden");
+  }
+
+  function showFullPlaybackOverlay() {
+    clearLoadingIndicatorTimer();
+    playerPlaceholder.classList.remove("is-hidden", "is-compact");
+  }
+
+  function showCompactPlaybackOverlay() {
+    clearLoadingIndicatorTimer();
+    playerPlaceholder.classList.remove("is-hidden");
+    playerPlaceholder.classList.add("is-compact");
+  }
+
+  function scheduleCompactPlaybackOverlay(attemptId) {
+    if (loadingIndicatorTimer && loadingIndicatorAttemptId === attemptId) return;
+    clearLoadingIndicatorTimer();
+    playerPlaceholder.classList.add("is-hidden");
+    playerPlaceholder.classList.remove("is-compact");
+    loadingIndicatorAttemptId = attemptId;
+    loadingIndicatorTimer = setTimeout(function () {
+      loadingIndicatorTimer = null;
+      loadingIndicatorAttemptId = -1;
+      if (
+        attemptId === state.playbackAttemptId &&
+        state.playbackStatus !== PLAYBACK_PLAYING
+      ) {
+        showCompactPlaybackOverlay();
+      }
+    }, LOADING_INDICATOR_DELAY_MS);
+  }
+
+  function updatePlaybackOverlay(event) {
+    if (state.playbackStatus === PLAYBACK_PLAYING) {
+      hasPlayedMedia = true;
+      hidePlaybackOverlay();
+      return;
+    }
+
+    if (state.playbackStatus === interaction.constants.PLAYBACK_FAILED ||
+        state.playbackStatus === interaction.constants.PLAYBACK_ENDED) {
+      showFullPlaybackOverlay();
+      return;
+    }
+
+    if (!hasPlayedMedia) {
+      showFullPlaybackOverlay();
+      return;
+    }
+
+    if (event.type === "PLAYBACK_BUFFERING") {
+      scheduleCompactPlaybackOverlay(state.playbackAttemptId);
     }
   }
 
@@ -306,8 +604,8 @@
     return message.replace(/https?:\/\/[^\s]+/gi, "[地址已隐藏]").slice(0, 160);
   }
 
-  function buildPlaybackDiagnostics(reason, error) {
-    var channel = channels[playingIndex];
+  function buildPlaybackDiagnostics(reason, error, retryCount) {
+    var channel = state.channels[state.playingIndex];
     var stream = getStreamInfo(channel ? channel.url : "");
     var support = stream.mime && player.canPlayType ? player.canPlayType(stream.mime) : "";
     var details = [
@@ -316,7 +614,7 @@
       "网络状态：" + getNetworkStateName(player.networkState),
       "就绪状态：" + getReadyStateName(player.readyState),
       "流类型：" + stream.label + (support ? "（" + support + "）" : ""),
-      "重试：" + playbackRetryCount + "/" + MAX_PLAYBACK_RETRIES
+      "重试：" + retryCount + "/" + MAX_PLAYBACK_RETRIES
     ];
     var safeMessage = sanitizeErrorMessage(error);
     if (safeMessage) details.push("浏览器信息：" + safeMessage);
@@ -327,7 +625,7 @@
       networkState: getNetworkStateName(player.networkState),
       readyState: getReadyStateName(player.readyState),
       streamType: stream.label,
-      retryCount: playbackRetryCount,
+      retryCount: retryCount,
       maxRetries: MAX_PLAYBACK_RETRIES
     };
     return details;
@@ -342,70 +640,96 @@
     retryTimer = null;
   }
 
-  function scheduleStallTimeout() {
+  function scheduleStallTimeout(attemptId) {
     clearTimeout(stallTimer);
-    if (!playbackHasStarted) return;
-    var attemptId = playbackAttemptId;
     stallTimer = setTimeout(function () {
-      if (attemptId === playbackAttemptId) {
-        handlePlaybackFailure("缓冲超过 " + Math.round(STALL_TIMEOUT_MS / 1000) + " 秒");
+      if (attemptId === state.playbackAttemptId && state.playbackHasStarted) {
+        reportPlaybackFailure(
+          "缓冲超过 " + Math.round(STALL_TIMEOUT_MS / 1000) + " 秒",
+          null,
+          attemptId
+        );
       }
     }, STALL_TIMEOUT_MS);
   }
 
-  function handlePlaybackFailure(reason, error) {
-    var attemptId = playbackAttemptId;
-    if (playingIndex < 0 || failedAttemptId === attemptId) return;
-    failedAttemptId = attemptId;
-    clearPlaybackTimers();
+  function schedulePlaybackRetry(attemptId, playingIndex) {
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(function () {
+      retryTimer = null;
+      if (
+        state.playbackStatus === PLAYBACK_RETRYING &&
+        state.playbackAttemptId === attemptId &&
+        state.playingIndex === playingIndex
+      ) {
+        beginPlaybackMetric("retry", null);
+        dispatch({
+          type: "START_PLAYBACK_ATTEMPT",
+          expectedPlayingIndex: playingIndex
+        });
+      }
+    }, RETRY_DELAY_MS);
+  }
 
-    var willRetry = playbackRetryCount < MAX_PLAYBACK_RETRIES;
-    if (willRetry) playbackRetryCount += 1;
-    var details = buildPlaybackDiagnostics(reason, error);
-    playerPlaceholder.classList.remove("is-hidden");
-
-    if (willRetry) {
-      setPlayerStatus("播放异常，正在重试…", details);
-      retryTimer = setTimeout(function () {
-        if (playingIndex >= 0) startPlaybackAttempt();
-      }, RETRY_DELAY_MS);
+  function reportPlaybackFailure(reason, error, attemptId) {
+    if (
+      state.playingIndex < 0 ||
+      attemptId !== state.playbackAttemptId ||
+      state.failedAttemptId === attemptId
+    ) {
       return;
     }
 
-    setPlayerStatus("频道播放失败，请按 OK 重试或切换频道", details);
+    var willRetry = state.playbackRetryCount < MAX_PLAYBACK_RETRIES;
+    var retryCount = willRetry
+      ? state.playbackRetryCount + 1
+      : state.playbackRetryCount;
+
+    dispatch({
+      type: "PLAYBACK_FAILURE",
+      attemptId: attemptId,
+      willRetry: willRetry,
+      retryCount: retryCount,
+      details: buildPlaybackDiagnostics(reason, error, retryCount)
+    });
   }
 
-  function startPlaybackAttempt() {
-    var channel = channels[playingIndex];
-    if (!channel) return;
+  function startPlaybackAttempt(attemptId, playingIndex) {
+    var channel = state.channels[playingIndex];
+    if (!channel || attemptId !== state.playbackAttemptId) return;
 
-    playbackAttemptId += 1;
-    var attemptId = playbackAttemptId;
-    failedAttemptId = -1;
-    playbackHasStarted = false;
     clearPlaybackTimers();
-
-    playerPlaceholder.classList.remove("is-hidden");
-    setPlayerStatus("正在连接 " + channel.name, [
-      "流类型：" + getStreamInfo(channel.url).label,
-      "尝试：" + (playbackRetryCount + 1) + "/" + (MAX_PLAYBACK_RETRIES + 1)
-    ]);
-
+    activeMediaAttemptId = attemptId;
+    activeMediaIndex = playingIndex;
+    attachPlaybackMetric(attemptId);
+    if (hasPlayedMedia) {
+      scheduleCompactPlaybackOverlay(attemptId);
+    } else {
+      showFullPlaybackOverlay();
+    }
     player.pause();
     player.src = channel.url;
+    recordPlaybackMetric("source", attemptId);
     player.load();
 
     startupTimer = setTimeout(function () {
-      if (attemptId === playbackAttemptId && !playbackHasStarted) {
-        handlePlaybackFailure("起播超过 " + Math.round(STARTUP_TIMEOUT_MS / 1000) + " 秒");
+      if (
+        attemptId === state.playbackAttemptId &&
+        !state.playbackHasStarted
+      ) {
+        reportPlaybackFailure(
+          "起播超过 " + Math.round(STARTUP_TIMEOUT_MS / 1000) + " 秒",
+          null,
+          attemptId
+        );
       }
     }, STARTUP_TIMEOUT_MS);
 
     var playPromise = player.play();
     if (playPromise && typeof playPromise.catch === "function") {
       playPromise.catch(function (error) {
-        if (attemptId !== playbackAttemptId || (error && error.name === "AbortError")) return;
-        handlePlaybackFailure("play() 被拒绝", error);
+        if (attemptId !== state.playbackAttemptId || (error && error.name === "AbortError")) return;
+        reportPlaybackFailure("play() 被拒绝", error, attemptId);
       });
     }
   }
@@ -413,8 +737,11 @@
   function renderChannels() {
     var fragment = document.createDocumentFragment();
     channelList.innerHTML = "";
+    channelItems = [];
+    renderedFocusedIndex = -1;
+    renderedPlayingIndex = -1;
 
-    channels.forEach(function (channel, index) {
+    state.channels.forEach(function (channel, index) {
       var item = document.createElement("button");
       var art = document.createElement("span");
       var number = document.createElement("span");
@@ -426,6 +753,7 @@
       item.className = "channel-item";
       item.setAttribute("role", "option");
       item.setAttribute("data-index", String(index));
+      item.setAttribute("aria-selected", "false");
 
       art.className = "channel-art";
       if (channel.logo) {
@@ -457,76 +785,65 @@
       item.appendChild(number);
       item.appendChild(copy);
       item.addEventListener("mouseenter", function () {
-        noteUserActivity();
-        focusedIndex = index;
-        updateFocus(false);
+        dispatch({ type: "CHANNEL_FOCUS", index: index });
       });
       item.addEventListener("focus", function () {
-        noteUserActivity();
-        focusedIndex = index;
-        updateFocus(false);
+        dispatch({ type: "CHANNEL_FOCUS", index: index });
       });
       item.addEventListener("click", function () {
-        noteUserActivity();
-        focusedIndex = index;
-        playFocusedChannel(true);
+        dispatch({
+          type: "CHANNEL_CLICK",
+          index: index,
+          inputAt: getMonotonicTime()
+        });
       });
+      channelItems.push(item);
       fragment.appendChild(item);
     });
 
     channelList.appendChild(fragment);
-    channelCount.textContent = String(channels.length);
-    updateFocus();
+    channelCount.textContent = String(state.channels.length);
   }
 
-  function updateFocus(shouldScroll) {
-    var items = channelList.querySelectorAll(".channel-item");
-
-    Array.prototype.forEach.call(items, function (item, index) {
-      item.classList.toggle("is-focused", index === focusedIndex);
-      item.classList.toggle("is-playing", index === playingIndex);
-      item.setAttribute("aria-selected", index === focusedIndex ? "true" : "false");
-    });
-
-    if (shouldScroll !== false && items[focusedIndex]) {
-      items[focusedIndex].scrollIntoView({ block: "nearest" });
+  function updateItemState(index, className, enabled) {
+    var item = channelItems[index];
+    if (!item) return;
+    item.classList.toggle(className, enabled);
+    if (className === "is-focused") {
+      item.setAttribute("aria-selected", enabled ? "true" : "false");
     }
   }
 
-  function moveFocus(delta) {
-    if (!channels.length) return;
-    focusedIndex = Math.max(0, Math.min(channels.length - 1, focusedIndex + delta));
-    updateFocus(true);
-  }
+  function updateFocus(previousState, shouldScroll) {
+    if (state.uiMode !== UI_MODE_CHANNELS) return;
 
-  function playFocusedChannel(shouldClosePanel) {
-    var channel = channels[focusedIndex];
-    if (!channel) return;
+    if (renderedFocusedIndex !== state.focusedIndex) {
+      updateItemState(renderedFocusedIndex, "is-focused", false);
+      updateItemState(state.focusedIndex, "is-focused", true);
+      renderedFocusedIndex = state.focusedIndex;
+    }
 
-    clearPlaybackTimers();
-    playbackRetryCount = 0;
-    playingIndex = focusedIndex;
-    currentTitle.textContent = channel.name;
-    nowPlayingTitle.textContent = channel.name;
-    nowPlayingGroup.textContent = channel.group;
-    rememberChannel(channel, playingIndex);
-    updateFocus();
-    startPlaybackAttempt();
+    if (renderedPlayingIndex !== state.playingIndex) {
+      updateItemState(renderedPlayingIndex, "is-playing", false);
+      updateItemState(state.playingIndex, "is-playing", true);
+      renderedPlayingIndex = state.playingIndex;
+    }
 
-    showUi();
-    if (shouldClosePanel) closeChannelPanel();
-    scheduleUiHide();
+    if (
+      shouldScroll &&
+      (previousState.uiMode !== UI_MODE_CHANNELS ||
+        previousState.focusedIndex !== state.focusedIndex) &&
+      channelItems[state.focusedIndex]
+    ) {
+      channelItems[state.focusedIndex].scrollIntoView({ block: "nearest" });
+    }
   }
 
   function loadPlaylist() {
     if (!PLAYLIST_URL) {
-      currentTitle.textContent = "尚未配置播放列表";
-      playerMessage.textContent = "请复制 config.example.js 为 config.js 并填写播放列表地址";
-      setConnectionState("未配置", "is-error");
+      dispatch({ type: "PLAYLIST_UNCONFIGURED" });
       return;
     }
-
-    setConnectionState("连接中", "");
 
     fetch(PLAYLIST_URL, buildPlaylistRequestOptions())
       .then(function (response) {
@@ -541,108 +858,89 @@
         });
       })
       .then(function (playlist) {
-        channels = parseM3U(playlist.text, playlist.baseUrl);
+        var channels = parseM3U(playlist.text, playlist.baseUrl);
         if (!channels.length) {
           throw new Error("播放列表中没有频道");
         }
 
-        setConnectionState("已连接", "is-online");
-        renderChannels();
-        focusedIndex = getInitialChannelIndex();
-        playFocusedChannel(false);
-        openChannelPanel();
+        dispatch({
+          type: "PLAYLIST_READY",
+          channels: channels,
+          initialIndex: getInitialChannelIndex(channels)
+        });
       })
       .catch(function (error) {
-        currentTitle.textContent = "播放列表加载失败";
-        setPlayerStatus(error.message + " · 请确认 M3U 数据源可访问");
-        setConnectionState("连接失败", "is-error");
+        dispatch({
+          type: "PLAYLIST_FAILED",
+          message: error.message + " · 请确认 M3U 数据源可访问"
+        });
       });
   }
 
-  function handleBack() {
-    if (isChannelPanelOpen) {
-      closeChannelPanel();
-      showUi();
-      scheduleUiHide();
-      return;
-    }
-
-    if (isUiVisible()) {
-      hideUi();
-      return;
-    }
-
-    if (window.webOS && window.webOS.platformBack) {
-      window.webOS.platformBack();
-    } else {
-      window.close();
-    }
-  }
-
   document.addEventListener("keydown", function (event) {
-    if (event.keyCode !== 461 && event.keyCode !== 27) noteUserActivity();
-
+    var inputAt = getMonotonicTime();
     switch (event.keyCode) {
       case 37:
         event.preventDefault();
-        closeChannelPanel();
+        dispatch({ type: "KEY_LEFT" });
         break;
       case 39:
         event.preventDefault();
-        openChannelPanel();
+        dispatch({ type: "KEY_RIGHT" });
         break;
       case 38:
         event.preventDefault();
-        if (!isChannelPanelOpen) openChannelPanel();
-        moveFocus(-1);
+        dispatch({ type: "KEY_UP", delta: -1, inputAt: inputAt });
         break;
       case 40:
         event.preventDefault();
-        if (!isChannelPanelOpen) openChannelPanel();
-        moveFocus(1);
+        dispatch({ type: "KEY_DOWN", delta: 1, inputAt: inputAt });
         break;
       case 13:
         event.preventDefault();
-        if (isChannelPanelOpen) {
-          playFocusedChannel(true);
-        } else {
-          openChannelPanel();
-        }
+        dispatch({ type: "KEY_OK", inputAt: inputAt });
         break;
       case 33:
         event.preventDefault();
-        if (!isChannelPanelOpen) openChannelPanel();
-        moveFocus(-8);
+        dispatch({ type: "KEY_PAGE_UP", delta: -8 });
         break;
       case 34:
         event.preventDefault();
-        if (!isChannelPanelOpen) openChannelPanel();
-        moveFocus(8);
+        dispatch({ type: "KEY_PAGE_DOWN", delta: 8 });
         break;
       case 461:
       case 27:
         event.preventDefault();
-        handleBack();
+        dispatch({ type: "KEY_BACK" });
         break;
       default:
+        dispatch({ type: "USER_ACTIVITY" });
         break;
     }
   });
 
   document.addEventListener("wheel", function (event) {
-    if (!channels.length) return;
     event.preventDefault();
-    noteUserActivity();
-    if (!isChannelPanelOpen) openChannelPanel();
+    var wasHidden = state.uiMode === UI_MODE_HIDDEN;
+    dispatch({ type: "WHEEL_ACTIVITY" });
+    if (wasHidden || !state.channels.length) {
+      wheelAccumulator = 0;
+      return;
+    }
+
     var now = Date.now();
-    if (now - lastWheelEventAt > 500 || (wheelAccumulator > 0 && event.deltaY < 0) || (wheelAccumulator < 0 && event.deltaY > 0)) {
+    if (
+      now - lastWheelEventAt > 500 ||
+      (wheelAccumulator > 0 && event.deltaY < 0) ||
+      (wheelAccumulator < 0 && event.deltaY > 0)
+    ) {
       wheelAccumulator = 0;
     }
     lastWheelEventAt = now;
     wheelAccumulator += event.deltaY;
 
     if (Math.abs(wheelAccumulator) < 80 || now - lastWheelStepAt < 120) return;
-    moveFocus(wheelAccumulator > 0 ? 1 : -1);
+    dispatch({ type: "WHEEL_STEP", delta: wheelAccumulator > 0 ? 1 : -1 });
     wheelAccumulator = 0;
     lastWheelStepAt = now;
   }, { passive: false });
@@ -651,45 +949,68 @@
     var now = Date.now();
     if (now - lastPointerActivityAt < 250) return;
     lastPointerActivityAt = now;
-    noteUserActivity();
+    dispatch({ type: "USER_ACTIVITY" });
   });
 
   player.addEventListener("playing", function () {
-    clearTimeout(startupTimer);
-    clearTimeout(stallTimer);
-    startupTimer = null;
-    stallTimer = null;
-    playbackHasStarted = true;
-    playerPlaceholder.classList.add("is-hidden");
+    if (channelSwitchTimer) return;
+    recordPlaybackMetric("playing", activeMediaAttemptId);
+    dispatch({
+      type: "PLAYBACK_PLAYING",
+      attemptId: activeMediaAttemptId
+    });
   });
 
   player.addEventListener("waiting", function () {
-    setPlayerStatus("正在缓冲…", buildPlaybackDiagnostics("播放器等待数据"));
-    playerPlaceholder.classList.remove("is-hidden");
-    scheduleStallTimeout();
+    if (channelSwitchTimer) return;
+    var attemptId = activeMediaAttemptId;
+    dispatch({
+      type: "PLAYBACK_BUFFERING",
+      attemptId: attemptId,
+      message: "正在缓冲…",
+      details: buildPlaybackDiagnostics("播放器等待数据", null, state.playbackRetryCount)
+    });
   });
 
   player.addEventListener("stalled", function () {
-    setPlayerStatus("媒体数据暂时中断…", buildPlaybackDiagnostics("网络数据停滞"));
-    playerPlaceholder.classList.remove("is-hidden");
-    scheduleStallTimeout();
+    if (channelSwitchTimer) return;
+    var attemptId = activeMediaAttemptId;
+    dispatch({
+      type: "PLAYBACK_BUFFERING",
+      attemptId: attemptId,
+      message: "媒体数据暂时中断…",
+      details: buildPlaybackDiagnostics("网络数据停滞", null, state.playbackRetryCount)
+    });
   });
 
   player.addEventListener("loadedmetadata", function () {
-    if (!playbackHasStarted) {
-      setPlayerStatus("媒体已识别，正在起播…", buildPlaybackDiagnostics("已读取媒体信息"));
-    }
+    if (channelSwitchTimer) return;
+    recordPlaybackMetric("metadata", activeMediaAttemptId);
+    dispatch({
+      type: "PLAYBACK_METADATA",
+      attemptId: activeMediaAttemptId,
+      details: buildPlaybackDiagnostics("已读取媒体信息", null, state.playbackRetryCount)
+    });
+  });
+
+  player.addEventListener("canplay", function () {
+    if (channelSwitchTimer) return;
+    recordPlaybackMetric("canplay", activeMediaAttemptId);
   });
 
   player.addEventListener("error", function () {
-    handlePlaybackFailure("媒体元素报告错误", player.error);
+    if (channelSwitchTimer) return;
+    reportPlaybackFailure("媒体元素报告错误", player.error, activeMediaAttemptId);
   });
 
   player.addEventListener("ended", function () {
-    if (playingIndex >= 0) {
-      setPlayerStatus("频道播放已结束，按 OK 重新播放", buildPlaybackDiagnostics("媒体播放结束"));
-      playerPlaceholder.classList.remove("is-hidden");
-    }
+    if (channelSwitchTimer) return;
+    var attemptId = activeMediaAttemptId;
+    dispatch({
+      type: "PLAYBACK_ENDED",
+      attemptId: attemptId,
+      details: buildPlaybackDiagnostics("媒体播放结束", null, state.playbackRetryCount)
+    });
   });
 
   function updateClock() {
@@ -700,6 +1021,7 @@
       String(now.getMinutes()).padStart(2, "0");
   }
 
+  renderState(state, { type: "INITIAL_RENDER" });
   updateClock();
   setInterval(updateClock, 30000);
   loadPlaylist();

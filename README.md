@@ -8,12 +8,15 @@
 - 支持配置请求方法、请求头、凭据和请求体
 - 解析频道名称、分组和播放地址
 - 支持 M3U 中相对于播放列表地址的频道 URL
-- 播放器始终占满屏幕，频道列表以左侧浮层显示
+- 播放器始终占满屏幕，启动播放时默认显示频道信息，频道列表以左侧浮层按需打开
 - 启动后自动播放上次选择的频道；没有有效记录时播放当前列表第一个频道
 - 5 秒没有遥控器或 Magic Remote 操作后自动隐藏界面，视频继续播放
 - 支持遥控器方向键、OK 和 Back
 - 支持鼠标点击，方便在浏览器和 Simulator 中调试
 - 使用原生 `<video>` 播放 rtp2httpd 提供的 HTTP 视频流
+- 连续上/下换台会合并为最后一次请求，避免反复重建媒体连接
+- 普通换台延迟显示紧凑 loading，已播放画面不会立刻被全屏遮罩覆盖
+- webOS 真机自动使用低合成开销的轻量视觉模式
 - 适配 1920×1080，并兼容较低分辨率的调试窗口
 
 ## 项目结构
@@ -23,7 +26,9 @@
 ├── appinfo.json   # webOS 应用清单
 ├── index.html     # 应用页面
 ├── styles.css     # 电视端界面样式
-├── app.js         # M3U 解析、遥控器和播放逻辑
+├── interaction.js # 操作状态机与事件转换
+├── app.js         # M3U、页面渲染和播放副作用
+├── docs/interaction-design.md # 操作状态与事件转换规范
 ├── config.example.js # 脱敏的本地配置模板
 ├── icon.png
 └── largeIcon.png
@@ -81,6 +86,12 @@ ares-server . --open
 
 普通浏览器适合检查布局、M3U 解析和基本交互。遥控器焦点与部分 webOS 行为应在 Simulator 中验证；实际解码、换台和长时间播放必须在真机上验证。
 
+状态机逻辑可以直接运行本地测试：
+
+```bash
+node tests/interaction.test.js
+```
+
 ## Simulator 调试
 
 ### 启动应用
@@ -103,8 +114,8 @@ ares-launch --simulator 25 .
 ```bash
 ares-launch \
   --simulator 25 \
-  --simulator-path /Users/odyssey/Development/env/webos/webOS_TV_25_Simulator_1.4.4 \
-  /Users/odyssey/Development/github/lg-webos-iptv
+  --simulator-path "$SIMULATOR_DIR" \
+  "$APP_DIR"
 ```
 
 也可以先手动打开 Simulator，然后选择 **File > Launch App**，选中包含 `appinfo.json` 的项目根目录。
@@ -256,14 +267,14 @@ LG 官方文档：
 | --- | --- |
 | 右 | 打开左侧频道列表 |
 | 左 | 收起频道列表 |
-| 上 / 下 | 打开列表并选择频道 |
-| OK | 列表打开时播放选中的频道；列表关闭时打开列表 |
-| Back | 列表打开时收起列表；界面显示时隐藏界面；全屏播放时退出应用 |
+| 上 / 下 | 信息界面或隐藏状态下直接换台；频道列表打开时只移动焦点 |
+| OK | 界面隐藏时先显示信息；播放失败或结束时直接重播；其他情况下打开列表或播放选中频道 |
+| Back | 信息或频道列表可见时隐藏界面；界面已经隐藏时弹出系统退出确认 |
 | Page Up / Page Down | 在电脑调试时快速跳过 8 个频道 |
 | Magic Remote 指针 | 悬停频道时同步焦点，点击播放 |
 | Magic Remote 滚轮 | 向上或向下移动一个频道 |
 
-任意遥控操作都会重新显示界面并重置隐藏计时；连续 5 秒没有操作后，顶部状态、频道列表、正在播放信息和操作提示都会隐藏，底层视频不会暂停或停止。
+界面隐藏时，导航上/下会直接换台并显示频道信息，右键会打开频道列表，其他普通按键和指针操作只显示信息界面；Back 会弹出系统退出确认。连续 5 秒没有操作后，顶部状态、频道列表、正在播放信息和操作提示都会隐藏，底层视频不会暂停或停止。播放失败或结束时，界面可见状态下按 OK 会优先直接重播当前频道。
 
 ## M3U 数据源配置
 
@@ -281,12 +292,21 @@ window.IPTV_CONFIG = {
     startupTimeoutMs: 15000,
     stallTimeoutMs: 12000,
     maxRetries: 2,
-    retryDelayMs: 1200
+    retryDelayMs: 1200,
+    channelSwitchDelayMs: 220,
+    loadingIndicatorDelayMs: 500
+  },
+  ui: {
+    simpleMode: "auto"
   }
 };
 ```
 
-`playback` 为可选播放容错配置：起播超过 `startupTimeoutMs`，或者已经播放后连续缓冲超过 `stallTimeoutMs`，应用会按 `retryDelayMs` 间隔重新加载当前频道，最多重试 `maxRetries` 次。切换频道或手动按 OK 会重置重试次数。
+`playback` 为可选播放配置：起播超过 `startupTimeoutMs`，或者已经播放后连续缓冲超过 `stallTimeoutMs`，应用会按 `retryDelayMs` 间隔重新加载当前频道，最多重试 `maxRetries` 次。`channelSwitchDelayMs` 用于合并连续上/下换台，`loadingIndicatorDelayMs` 控制普通换台多久后才显示紧凑 loading。切换频道或手动按 OK 会重置重试次数。
+
+`ui.simpleMode` 默认是 `"auto"`，在 webOS 运行时自动关闭模糊滤镜、重阴影、平滑滚动和较长动画。也可以设为 `true` / `"on"` 强制开启，或设为 `false` / `"off"` 强制关闭。
+
+调试换台耗时时可以在 Inspector 中读取 `window.__IPTV_PERFORMANCE__`。对象只包含最近一次尝试的阶段耗时和尝试编号，不包含频道名称、播放地址、请求头或原始错误信息。
 
 播放失败时界面会显示脱敏诊断，包括 `MediaError`、`networkState`、`readyState`、推断的流类型和已用重试次数。诊断不会显示频道 URL、查询参数或请求头。`MEDIA_ERR_SRC_NOT_SUPPORTED` 只表示当前目标无法打开该媒体，不等同于服务器不可访问；Simulator 上的 MPEG-TS、HEVC 等错误仍需在真机复现。
 

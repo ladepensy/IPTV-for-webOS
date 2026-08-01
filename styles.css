@@ -428,6 +428,43 @@ h1 {
   display: none;
 }
 
+.player-placeholder.is-compact {
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  width: auto;
+  max-width: min(520px, 80vw);
+  min-height: 68px;
+  gap: 14px;
+  padding: 14px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(5, 7, 13, 0.82);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.32);
+  font-size: 16px;
+  transform: translate(-50%, -50%);
+}
+
+.player-placeholder.is-compact .signal-mark {
+  height: 32px;
+  gap: 4px;
+}
+
+.player-placeholder.is-compact .signal-mark span {
+  width: 5px;
+}
+
+.player-placeholder.is-compact .signal-mark span:nth-child(1) { height: 12px; }
+.player-placeholder.is-compact .signal-mark span:nth-child(2) { height: 21px; }
+.player-placeholder.is-compact .signal-mark span:nth-child(3) { height: 30px; }
+
+.player-placeholder.is-compact .player-diagnostics {
+  display: none;
+}
+
 .signal-mark {
   display: flex;
   align-items: end;
@@ -575,6 +612,48 @@ kbd {
   opacity: 0;
   pointer-events: none;
   transform: translateX(calc(-100% - 60px)) scale(0.98);
+}
+
+.webos-simple-ui .app-shell {
+  background: #05070d;
+}
+
+.webos-simple-ui .brand-mark,
+.webos-simple-ui .channel-panel,
+.webos-simple-ui .now-playing,
+.webos-simple-ui .player-diagnostics {
+  backdrop-filter: none;
+}
+
+.webos-simple-ui .brand-mark,
+.webos-simple-ui .channel-panel,
+.webos-simple-ui .now-playing,
+.webos-simple-ui .channel-item,
+.webos-simple-ui .player-placeholder.is-compact {
+  box-shadow: none;
+}
+
+.webos-simple-ui .channel-panel {
+  background: rgba(14, 18, 29, 0.96);
+  transition-duration: 140ms;
+}
+
+.webos-simple-ui .topbar,
+.webos-simple-ui .now-playing,
+.webos-simple-ui footer {
+  transition-duration: 140ms;
+}
+
+.webos-simple-ui .channel-item {
+  transition: background 100ms linear, border-color 100ms linear;
+}
+
+.webos-simple-ui .channel-item.is-focused {
+  transform: none;
+}
+
+.webos-simple-ui .channel-list {
+  scroll-behavior: auto;
 }
 
 @media (max-width: 1280px) {
