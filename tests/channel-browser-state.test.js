@@ -4,6 +4,7 @@ var assert = require("assert");
 var browserApi = require("../features/channels/channel-browser-state.js");
 var context = {
   sources: [{ name: "Home" }],
+  canAddSource: true,
   channels: [
     { name: "News One", group: "News" },
     { name: "Sports One", group: "Sports" },
@@ -23,8 +24,9 @@ state = outcome.state;
 assert.strictEqual(outcome.action.type, "SOURCE_SELECTED");
 assert.strictEqual(state.column, browserApi.constants.COLUMN_GROUPS);
 
+assert.strictEqual(state.focusedGroupIndex, 1);
 state = browserApi.transition(state, { type: "MOVE", delta: 2 }, context).state;
-assert.strictEqual(state.focusedGroupIndex, 2);
+assert.strictEqual(state.focusedGroupIndex, 3);
 outcome = browserApi.transition(state, { type: "CONFIRM" }, context);
 state = outcome.state;
 assert.strictEqual(outcome.action.type, "GROUP_SELECTED");
@@ -44,5 +46,18 @@ state = browserApi.transition(state, { type: "LEFT" }, context).state;
 assert.strictEqual(state.column, browserApi.constants.COLUMN_SOURCES);
 outcome = browserApi.transition(state, { type: "LEFT" }, context);
 assert.strictEqual(outcome.action.type, "CLOSE");
+
+state = browserApi.createInitialState(0);
+state = browserApi.transition(state, { type: "MOVE", delta: 1 }, context).state;
+outcome = browserApi.transition(state, { type: "CONFIRM" }, context);
+assert.strictEqual(outcome.action.type, "ADD_SOURCE");
+assert.strictEqual(outcome.state.column, browserApi.constants.COLUMN_SOURCES);
+
+state = browserApi.createInitialState(0);
+state = browserApi.transition(state, { type: "RIGHT" }, context).state;
+state = browserApi.transition(state, { type: "MOVE", delta: -1 }, context).state;
+outcome = browserApi.transition(state, { type: "CONFIRM" }, context);
+assert.strictEqual(outcome.action.type, "EDIT_SOURCE");
+assert.strictEqual(outcome.state.column, browserApi.constants.COLUMN_GROUPS);
 
 process.stdout.write("channel browser state tests passed\n");

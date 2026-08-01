@@ -153,6 +153,9 @@
 .browser-item.is-selected:not(.is-focused) { background: rgba(255, 79, 130, 0.09); }
 .browser-item.is-playing:not(.is-focused) { background: rgba(255, 79, 130, 0.07); }
 
+.action-item .item-title { color: var(--accent-bright); }
+.action-item .item-accent { background: var(--cyan); }
+
 .item-copy {
   display: block;
   min-width: 0;

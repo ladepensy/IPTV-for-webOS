@@ -61,6 +61,7 @@ var epgListElement = createElement();
 var focusedIndex = -1;
 var selected = null;
 var selectedGroup = -1;
+var selectedSource = -1;
 var view = channelPanelApi.create({
   panelElement: panelElement,
   trackElement: trackElement,
@@ -73,7 +74,7 @@ var view = channelPanelApi.create({
   epgTitleElement: epgTitleElement,
   epgListElement: epgListElement,
   onSourceFocus: function () {},
-  onSourceSelect: function () {},
+  onSourceSelect: function (index) { selectedSource = index; },
   onGroupFocus: function () {},
   onGroupSelect: function (index) { selectedGroup = index; },
   onFocus: function (index) { focusedIndex = index; },
@@ -93,7 +94,9 @@ var programs = [{
 view.render({
   open: true,
   browserColumn: 2,
-  sources: [{ name: "Home M3U" }],
+  sources: [{ id: "source-home", name: "Home M3U" }],
+  activeSourceId: "source-home",
+  canAddSource: true,
   channels: channels,
   selectedGroup: "News",
   focusedSourceIndex: 0,
@@ -107,8 +110,8 @@ view.render({
 assert.strictEqual(panelElement.classList.contains("is-open"), true);
 assert.strictEqual(panelElement.classList.contains("is-column-channels"), true);
 assert.strictEqual(panelElement.getAttribute("aria-hidden"), "false");
-assert.strictEqual(sourceListElement.children.length, 1);
-assert.strictEqual(groupListElement.children.length, 3);
+assert.strictEqual(sourceListElement.children.length, 2);
+assert.strictEqual(groupListElement.children.length, 4);
 assert.strictEqual(channelListElement.children.length, 1);
 assert.strictEqual(countElement.textContent, "1");
 assert.strictEqual(columnTitleElement.textContent, "News");
@@ -120,15 +123,19 @@ assert.strictEqual(epgListElement.children.length, 1);
 
 channelListElement.children[0].emit("mouseenter");
 channelListElement.children[0].emit("click");
-groupListElement.children[2].emit("click");
+groupListElement.children[3].emit("click");
+sourceListElement.children[1].emit("click");
 assert.strictEqual(focusedIndex, 0);
 assert.deepStrictEqual(selected, { index: 0, inputAt: 42 });
-assert.strictEqual(selectedGroup, 2);
+assert.strictEqual(selectedGroup, 3);
+assert.strictEqual(selectedSource, 1);
 
 view.render({
   open: false,
   browserColumn: 0,
-  sources: [{ name: "Home M3U" }],
+  sources: [{ id: "source-home", name: "Home M3U" }],
+  activeSourceId: "source-home",
+  canAddSource: true,
   channels: channels,
   selectedGroup: "全部",
   focusedSourceIndex: 0,

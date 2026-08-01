@@ -16,6 +16,7 @@
     UI_MODE_HIDDEN: "hidden",
     UI_MODE_INFO: "info",
     UI_MODE_CHANNELS: "channels",
+    UI_MODE_SOURCE_FORM: "source-form",
     PLAYBACK_IDLE: "idle",
     PLAYBACK_LOADING: "loading",
     PLAYBACK_PLAYING: "playing",
@@ -35,6 +36,8 @@
         playlistStatus: "loading",
         channels: [],
         playlistSources: [],
+        activeSourceId: "",
+        canAddSource: true,
         channelBrowser: channelBrowserApi.createInitialState(0),
         playingIndex: -1,
         playbackStatus: constants.PLAYBACK_IDLE,
@@ -78,7 +81,8 @@
     function getBrowserContext(nextState) {
       return {
         channels: nextState.channels,
-        sources: nextState.playlistSources
+        sources: nextState.playlistSources,
+        canAddSource: nextState.canAddSource
       };
     }
 
@@ -112,6 +116,28 @@
       nextState.titleMessage = "";
     }
 
+    function handleBrowserAction(nextState, action, effects) {
+      if (!action) return;
+      if (action.type === "ADD_SOURCE") {
+        nextState.uiMode = constants.UI_MODE_SOURCE_FORM;
+        effects.push(effect("CANCEL_UI_HIDE"));
+        effects.push(effect("OPEN_SOURCE_FORM", { mode: "add" }));
+        return;
+      }
+      if (action.type === "EDIT_SOURCE") {
+        nextState.uiMode = constants.UI_MODE_SOURCE_FORM;
+        effects.push(effect("CANCEL_UI_HIDE"));
+        effects.push(effect("OPEN_SOURCE_FORM", { mode: "edit" }));
+        return;
+      }
+      if (action.type === "SOURCE_SELECTED") {
+        var source = nextState.playlistSources[action.index];
+        if (source && source.id !== nextState.activeSourceId) {
+          effects.push(effect("LOAD_SOURCE", { index: action.index }));
+        }
+      }
+    }
+
     function transition(current, event) {
       var next = copyState(current);
       var effects = [];
@@ -119,6 +145,7 @@
 
       switch (event.type) {
         case "USER_ACTIVITY":
+          if (next.uiMode === constants.UI_MODE_SOURCE_FORM) break;
           if (next.uiMode === constants.UI_MODE_HIDDEN) {
             next.uiMode = constants.UI_MODE_INFO;
           }
@@ -126,12 +153,14 @@
           break;
 
         case "POINTER_MOVE":
+          if (next.uiMode === constants.UI_MODE_SOURCE_FORM) break;
           if (next.uiMode !== constants.UI_MODE_HIDDEN) {
             effects.push(effect("SCHEDULE_UI_HIDE"));
           }
           break;
 
         case "KEY_LEFT":
+          if (next.uiMode === constants.UI_MODE_SOURCE_FORM) break;
           if (next.uiMode === constants.UI_MODE_CHANNELS) {
             var leftAction = updateChannelBrowser(next, { type: "LEFT" });
             if (leftAction && leftAction.type === "CLOSE") {
@@ -144,6 +173,7 @@
           break;
 
         case "KEY_RIGHT":
+          if (next.uiMode === constants.UI_MODE_SOURCE_FORM) break;
           if (next.uiMode !== constants.UI_MODE_CHANNELS) {
             openChannels(next);
           } else {
@@ -154,12 +184,13 @@
 
         case "KEY_UP":
         case "KEY_DOWN":
-          if (!next.channels.length) break;
+          if (next.uiMode === constants.UI_MODE_SOURCE_FORM) break;
           if (next.uiMode === constants.UI_MODE_CHANNELS) {
             updateChannelBrowser(next, { type: "MOVE", delta: event.delta });
             effects.push(effect("SCHEDULE_UI_HIDE"));
             break;
           }
+          if (!next.channels.length) break;
 
           var currentPlayingIndex = next.playingIndex >= 0
             ? next.playingIndex
@@ -182,18 +213,22 @@
 
         case "KEY_PAGE_UP":
         case "KEY_PAGE_DOWN":
+          if (next.uiMode === constants.UI_MODE_SOURCE_FORM) break;
           if (next.uiMode === constants.UI_MODE_HIDDEN) {
             next.uiMode = constants.UI_MODE_INFO;
             effects.push(effect("SCHEDULE_UI_HIDE"));
             break;
           }
-          if (!next.channels.length) break;
-          if (next.uiMode !== constants.UI_MODE_CHANNELS) openChannels(next);
+          if (next.uiMode !== constants.UI_MODE_CHANNELS) {
+            if (!next.channels.length) break;
+            openChannels(next);
+          }
           updateChannelBrowser(next, { type: "MOVE", delta: event.delta });
           effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 
         case "KEY_OK":
+          if (next.uiMode === constants.UI_MODE_SOURCE_FORM) break;
           if (next.uiMode === constants.UI_MODE_HIDDEN) {
             next.uiMode = constants.UI_MODE_INFO;
             effects.push(effect("SCHEDULE_UI_HIDE"));
@@ -216,8 +251,9 @@
             break;
           }
 
-          if (next.uiMode === constants.UI_MODE_CHANNELS && next.channels.length) {
+          if (next.uiMode === constants.UI_MODE_CHANNELS) {
             var confirmAction = updateChannelBrowser(next, { type: "CONFIRM" });
+            handleBrowserAction(next, confirmAction, effects);
             if (confirmAction && confirmAction.type === "CHANNEL_SELECTED") {
               selectChannel(next, confirmAction.index);
               effects.push(effect("REMEMBER_CHANNEL"));
@@ -239,6 +275,7 @@
           break;
 
         case "KEY_BACK":
+          if (next.uiMode === constants.UI_MODE_SOURCE_FORM) break;
           if (next.uiMode === constants.UI_MODE_HIDDEN) {
             effects.push(effect("EXIT_APP"));
           } else {
@@ -248,40 +285,45 @@
           break;
 
         case "WHEEL_ACTIVITY":
+          if (next.uiMode === constants.UI_MODE_SOURCE_FORM) break;
           if (next.uiMode === constants.UI_MODE_HIDDEN) {
             next.uiMode = constants.UI_MODE_INFO;
             effects.push(effect("SCHEDULE_UI_HIDE"));
             break;
           }
-          if (!next.channels.length) break;
-          if (next.uiMode !== constants.UI_MODE_CHANNELS) openChannels(next);
+          if (next.uiMode !== constants.UI_MODE_CHANNELS) {
+            if (!next.channels.length && !next.playlistSources.length) break;
+            openChannels(next);
+          }
           effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 
         case "WHEEL_STEP":
+          if (next.uiMode === constants.UI_MODE_SOURCE_FORM) break;
           if (next.uiMode === constants.UI_MODE_HIDDEN) {
             next.uiMode = constants.UI_MODE_INFO;
             effects.push(effect("SCHEDULE_UI_HIDE"));
             break;
           }
-          if (!next.channels.length) break;
-          if (next.uiMode !== constants.UI_MODE_CHANNELS) openChannels(next);
+          if (next.uiMode !== constants.UI_MODE_CHANNELS) {
+            if (!next.channels.length && !next.playlistSources.length) break;
+            openChannels(next);
+          }
           updateChannelBrowser(next, { type: "MOVE", delta: event.delta });
           effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 
         case "SOURCE_FOCUS":
-          if (!next.playlistSources[event.index]) break;
           next.uiMode = constants.UI_MODE_CHANNELS;
           updateChannelBrowser(next, { type: "SOURCE_FOCUS", index: event.index });
           effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 
         case "SOURCE_SELECT":
-          if (!next.playlistSources[event.index]) break;
           next.uiMode = constants.UI_MODE_CHANNELS;
-          updateChannelBrowser(next, { type: "SOURCE_SELECT", index: event.index });
-          effects.push(effect("SCHEDULE_UI_HIDE"));
+          var sourceAction = updateChannelBrowser(next, { type: "SOURCE_SELECT", index: event.index });
+          handleBrowserAction(next, sourceAction, effects);
+          if (next.uiMode !== constants.UI_MODE_SOURCE_FORM) effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 
         case "GROUP_FOCUS":
@@ -292,8 +334,9 @@
 
         case "GROUP_SELECT":
           next.uiMode = constants.UI_MODE_CHANNELS;
-          updateChannelBrowser(next, { type: "GROUP_SELECT", index: event.index });
-          effects.push(effect("SCHEDULE_UI_HIDE"));
+          var groupAction = updateChannelBrowser(next, { type: "GROUP_SELECT", index: event.index });
+          handleBrowserAction(next, groupAction, effects);
+          if (next.uiMode !== constants.UI_MODE_SOURCE_FORM) effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 
         case "CHANNEL_FOCUS":
@@ -315,26 +358,85 @@
           break;
 
         case "UI_TIMEOUT":
-          next.uiMode = constants.UI_MODE_HIDDEN;
+          if (next.uiMode !== constants.UI_MODE_SOURCE_FORM) {
+            next.uiMode = constants.UI_MODE_HIDDEN;
+          }
+          break;
+
+        case "SOURCES_UPDATED":
+          next.playlistSources = event.sources || [];
+          next.activeSourceId = event.activeSourceId || "";
+          next.canAddSource = event.canAddSource !== false;
+          if (!event.preserveBrowser) {
+            updateChannelBrowser(next, {
+              type: "RESET",
+              initialChannelIndex: next.playingIndex,
+              initialSourceIndex: Math.max(0, Number(event.activeSourceIndex) || 0)
+            });
+          }
+          break;
+
+        case "SOURCE_FORM_CLOSED":
+          next.uiMode = event.returnMode === constants.UI_MODE_INFO
+            ? constants.UI_MODE_INFO
+            : constants.UI_MODE_CHANNELS;
+          effects.push(effect("SCHEDULE_UI_HIDE"));
+          break;
+
+        case "SOURCE_FORM_OPENED":
+          next.uiMode = constants.UI_MODE_SOURCE_FORM;
+          effects.push(effect("CANCEL_UI_HIDE"));
+          break;
+
+        case "PLAYLIST_LOADING":
+          next.playlistStatus = "loading";
+          if (!next.channels.length) {
+            next.titleMessage = "正在载入播放源…";
+            next.playerMessage = "正在获取播放列表";
+            next.playerDetails = [];
+          }
+          break;
+
+        case "ACTIVE_SOURCE_REMOVED":
+          next.channels = [];
+          next.playingIndex = -1;
+          next.playbackStatus = constants.PLAYBACK_IDLE;
+          next.playbackRetryCount = 0;
+          next.playbackHasStarted = false;
+          next.titleMessage = "正在切换播放源…";
+          next.playerMessage = "正在获取播放列表";
+          next.playerDetails = [];
           break;
 
         case "PLAYLIST_UNCONFIGURED":
           next.playlistStatus = "unconfigured";
+          next.channels = [];
+          next.playlistSources = [];
+          next.activeSourceId = "";
+          next.playingIndex = -1;
+          next.playbackStatus = constants.PLAYBACK_IDLE;
           next.uiMode = constants.UI_MODE_INFO;
           next.titleMessage = "尚未配置播放列表";
-          next.playerMessage = "请复制 config.example.js 为 config.js 并填写播放列表地址";
+          next.playerMessage = "请添加一个 M3U 播放源";
           next.playerDetails = [];
           break;
 
         case "PLAYLIST_READY":
           next.playlistStatus = "ready";
           next.channels = event.channels;
-          next.playlistSources = event.sources || [{ name: event.playlistName || "当前 M3U" }];
+          next.playlistSources = event.sources || next.playlistSources;
+          next.activeSourceId = event.activeSourceId || next.activeSourceId;
+          next.canAddSource = event.canAddSource !== false;
           updateChannelBrowser(next, {
             type: "RESET",
-            initialChannelIndex: event.initialIndex
+            initialChannelIndex: event.initialIndex,
+            initialSourceIndex: event.activeSourceIndex
           });
           selectChannel(next, event.initialIndex);
+          if (event.openChannels) {
+            next.uiMode = constants.UI_MODE_CHANNELS;
+            next.channelBrowser.column = channelBrowserApi.constants.COLUMN_GROUPS;
+          }
           effects.push(effect("REMEMBER_CHANNEL"));
           effects.push(effect("START_PLAYBACK"));
           effects.push(effect("SCHEDULE_UI_HIDE"));
@@ -460,7 +562,8 @@
         "KEY_PAGE_DOWN",
         "WHEEL_ACTIVITY",
         "WHEEL_STEP",
-        "PLAYLIST_READY"
+        "PLAYLIST_READY",
+        "SOURCES_UPDATED"
       ].indexOf(event.type) >= 0;
     }
 

@@ -5,6 +5,7 @@
 ## 当前功能
 
 - 从本地配置文件指定任意 M3U 数据源
+- 可在电视端添加、编辑和删除最多 10 个 M3U 播放源，并记住上次使用的播放源
 - 支持配置请求方法、请求头、凭据和请求体
 - 解析频道名称、分组和播放地址
 - 支持 M3U 中相对于播放列表地址的频道 URL
@@ -29,10 +30,14 @@
 ├── index.html     # 应用页面
 ├── styles.css     # 电视端全局界面样式
 ├── features/
-│   └── channels/
-│       ├── channel-browser-state.js # M3U、分组、频道三级子状态机
-│       ├── channel-panel.js  # 频道列表渲染、焦点与输入适配
-│       └── channel-panel.css # 频道列表独立样式
+│   ├── channels/
+│   │   ├── channel-browser-state.js # M3U、分组、频道三级子状态机
+│   │   ├── channel-panel.js  # 频道列表渲染、焦点与输入适配
+│   │   └── channel-panel.css # 频道列表独立样式
+│   └── sources/
+│       ├── source-store.js # 播放源持久化、迁移与数量限制
+│       ├── source-form.js  # 添加、编辑和删除播放源交互
+│       └── source-form.css # 播放源表单样式
 ├── interaction.js # 操作状态机与事件转换
 ├── app.js         # M3U、全局渲染和播放副作用
 ├── docs/interaction-design.md # 操作状态与事件转换规范
@@ -102,6 +107,8 @@ ares-server . --open
 node tests/interaction.test.js
 node tests/channel-browser-state.test.js
 node tests/channel-panel.test.js
+node tests/source-store.test.js
+node tests/source-form.test.js
 ```
 
 ## Simulator 调试
@@ -264,7 +271,7 @@ ares-install --device myTV com.odyssey.webos.iptv_0.1.0_all.ipk
 ares-launch --device myTV com.odyssey.webos.iptv
 ```
 
-`config.js` 会被打进 IPK。安装前应确认其中使用的是电视能够访问的局域网地址，而不是 `localhost` 或 `127.0.0.1`。生成的 `*.ipk` 和本地 `config.js` 均已被 `.gitignore` 忽略。
+`config.js` 会被打进 IPK，并在电视端尚未初始化播放源时作为首次导入配置。安装前应确认其中使用的是电视能够访问的局域网地址，而不是 `localhost` 或 `127.0.0.1`。生成的 `*.ipk` 和本地 `config.js` 均已被 `.gitignore` 忽略。
 
 代码修改后，重新执行打包、安装和启动命令即可覆盖开发版本。
 
@@ -298,7 +305,7 @@ ares-launch --device myTV --close com.odyssey.webos.iptv
 - `ares-novacom --getkey` 失败：确认 Key Server 为 ON、IP 正确，并重新输入区分大小写的 Passphrase。
 - 端口连接失败：确认使用 `9922`，电脑与电视处于同一局域网，路由器未启用客户端隔离。
 - Developer Mode 突然失效：检查 Remain Session；过期前在 Developer Mode App 中点击 EXTEND。
-- 应用能打开但列表加载失败：确认 `config.js` 中的服务器地址可由电视访问，并检查服务器防火墙与 CORS。
+- 应用能打开但列表加载失败：在第二列选择“编辑此播放源”，确认服务器地址可由电视访问，并检查服务器防火墙与 CORS。
 - 列表正常但频道无法播放：在真机 Inspector 查看 `MediaError`，并核对频道容器、视频编码和音频编码。
 
 LG 官方文档：
@@ -324,7 +331,7 @@ LG 官方文档：
 
 ## M3U 数据源配置
 
-应用从未跟踪的 `config.js` 读取播放列表配置。推荐格式：
+应用会把电视端管理的播放源保存在本地存储中。首次升级时，如果本地还没有初始化播放源，会将未跟踪的 `config.js` 播放列表配置自动导入为第一个播放源；完成初始化后，以电视端保存的播放源为准。推荐的首次引导配置格式：
 
 ```js
 window.IPTV_CONFIG = {
@@ -401,7 +408,7 @@ window.IPTV_CONFIG = {
 
 rtp2httpd 只是可选数据源之一。例如使用它时可以将 `url` 设置为 `http://<server>:5140/playlist.m3u`；也可以替换为任何其他能够返回 M3U 的服务。
 
-如数据源地址或请求参数发生变化，只需修改本地 `config.js`，无需修改或提交应用源码。认证 Token 等私人信息只能保存在未跟踪的 `config.js` 中；它们会随 IPK 安装到电视，不应提交到仓库。
+电视端初始化完成后，名称和 M3U 地址应通过播放源编辑界面修改。`config.js` 主要用于首次导入以及带请求头、请求体等高级请求配置的部署场景；认证 Token 等私人信息只能保存在未跟踪的 `config.js` 中，不应提交到仓库。
 
 ## 已知限制
 

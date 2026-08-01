@@ -23,6 +23,10 @@ var state = machine.createInitialState();
 var outcome = send(state, {
   type: "PLAYLIST_READY",
   channels: channels,
+  sources: [{ id: "source-home", name: "Home" }],
+  activeSourceId: "source-home",
+  activeSourceIndex: 0,
+  canAddSource: true,
   initialIndex: 0
 });
 state = outcome.state;
@@ -57,7 +61,7 @@ assert.strictEqual(state.playlistSources.length, 1);
 state = send(state, { type: "KEY_RIGHT" }).state;
 assert.strictEqual(state.channelBrowser.column, 1);
 state = send(state, { type: "KEY_DOWN", delta: 1 }).state;
-assert.strictEqual(state.channelBrowser.focusedGroupIndex, 1);
+assert.strictEqual(state.channelBrowser.focusedGroupIndex, 2);
 state = send(state, { type: "KEY_RIGHT" }).state;
 assert.strictEqual(state.channelBrowser.column, 2);
 assert.strictEqual(state.channelBrowser.selectedGroup, "Test");
@@ -132,5 +136,47 @@ state.playbackAttemptId = 5;
 state.playbackStatus = constants.PLAYBACK_LOADING;
 outcome = send(state, { type: "PLAYBACK_PLAYING", attemptId: 4 });
 assert.strictEqual(outcome.state.playbackStatus, constants.PLAYBACK_LOADING);
+
+state = machine.createInitialState();
+state.playlistSources = [{ id: "source-home", name: "Home" }];
+state.activeSourceId = "source-home";
+state.canAddSource = true;
+state.uiMode = constants.UI_MODE_CHANNELS;
+state.channelBrowser.focusedSourceIndex = 1;
+outcome = send(state, { type: "KEY_OK" });
+assert.strictEqual(outcome.state.uiMode, constants.UI_MODE_SOURCE_FORM);
+assert.ok(outcome.effects.some(function (item) { return item.type === "OPEN_SOURCE_FORM"; }));
+
+state = machine.createInitialState();
+state.playlistSources = [{ id: "source-home", name: "Home" }];
+state.activeSourceId = "source-home";
+state.uiMode = constants.UI_MODE_CHANNELS;
+state.channelBrowser.column = 1;
+state.channelBrowser.focusedGroupIndex = 0;
+outcome = send(state, { type: "KEY_OK" });
+assert.strictEqual(outcome.state.uiMode, constants.UI_MODE_SOURCE_FORM);
+assert.ok(outcome.effects.some(function (item) {
+  return item.type === "OPEN_SOURCE_FORM" && item.mode === "edit";
+}));
+
+state = machine.createInitialState();
+state.playlistSources = [
+  { id: "source-home", name: "Home" },
+  { id: "source-backup", name: "Backup" }
+];
+state.activeSourceId = "source-home";
+state.uiMode = constants.UI_MODE_CHANNELS;
+state.channelBrowser.focusedSourceIndex = 1;
+outcome = send(state, { type: "KEY_OK" });
+assert.ok(outcome.effects.some(function (item) {
+  return item.type === "LOAD_SOURCE" && item.index === 1;
+}));
+
+state = machine.createInitialState();
+state.playlistSources = [{ id: "failed", name: "Failed" }];
+state.canAddSource = true;
+state.uiMode = constants.UI_MODE_CHANNELS;
+outcome = send(state, { type: "KEY_DOWN", delta: 1 });
+assert.strictEqual(outcome.state.channelBrowser.focusedSourceIndex, 1);
 
 process.stdout.write("interaction tests passed\n");

@@ -3,11 +3,22 @@
 
   var config = window.IPTV_CONFIG || {};
   var playlistConfig = config.playlist || {};
-  var PLAYLIST_URL = playlistConfig.url || config.playlistUrl || "";
-  var PLAYLIST_REQUEST = playlistConfig.request || config.playlistRequest || {};
   var epgConfig = config.epg || {};
-  var EPG_URL = epgConfig.url || "";
-  var EPG_REQUEST = epgConfig.request || {};
+  var sourceStore = window.IPTVSourceStore.create({
+    storage: window.localStorage,
+    legacyConfig: {
+      name: playlistConfig.name || "",
+      url: playlistConfig.url || config.playlistUrl || "",
+      request: playlistConfig.request || config.playlistRequest || {},
+      epgUrl: epgConfig.url || "",
+      epgRequest: epgConfig.request || {}
+    }
+  });
+  var activeSource = sourceStore.getActive();
+  var PLAYLIST_URL = "";
+  var PLAYLIST_REQUEST = {};
+  var EPG_URL = "";
+  var EPG_REQUEST = {};
   var playbackConfig = config.playback || {};
   var STARTUP_TIMEOUT_MS = getNumberOption(playbackConfig.startupTimeoutMs, 15000, 5000, 60000);
   var STALL_TIMEOUT_MS = getNumberOption(playbackConfig.stallTimeoutMs, 12000, 5000, 60000);
@@ -27,7 +38,11 @@
   );
   var uiConfig = config.ui || {};
   var UI_HIDE_DELAY_MS = 5000;
+  var CHANNEL_REMEMBER_DELAY_MS = 1500;
   var LAST_CHANNEL_STORAGE_KEY = "home-iptv:last-channel";
+  var playlistLoadId = 0;
+
+  applySourceConfig(activeSource);
 
   var interaction = window.IPTVInteraction.create({
     maxPlaybackRetries: MAX_PLAYBACK_RETRIES,
@@ -35,6 +50,7 @@
   });
   var UI_MODE_HIDDEN = interaction.constants.UI_MODE_HIDDEN;
   var UI_MODE_CHANNELS = interaction.constants.UI_MODE_CHANNELS;
+  var UI_MODE_SOURCE_FORM = interaction.constants.UI_MODE_SOURCE_FORM;
   var PLAYBACK_PLAYING = interaction.constants.PLAYBACK_PLAYING;
   var PLAYBACK_RETRYING = interaction.constants.PLAYBACK_RETRYING;
   var state = interaction.createInitialState();
@@ -43,6 +59,7 @@
   var stallTimer = null;
   var retryTimer = null;
   var channelSwitchTimer = null;
+  var channelRememberTimer = null;
   var loadingIndicatorTimer = null;
   var loadingIndicatorAttemptId = -1;
   var uiHideTimer = null;
@@ -57,6 +74,7 @@
   var lastPointerActivityAt = 0;
   var discoveredEpgUrl = "";
   var epgProgramsByChannel = {};
+  var pendingChannelMemories = {};
 
   var uiLayer = document.getElementById("ui-layer");
   var currentTitle = document.getElementById("current-title");
@@ -108,6 +126,144 @@
     },
     getInputTime: getMonotonicTime
   });
+  var sourceFormView = window.IPTVSourceForm.create({
+    rootElement: document.getElementById("source-form-overlay"),
+    titleElement: document.getElementById("source-form-title"),
+    subtitleElement: document.getElementById("source-form-subtitle"),
+    nameInput: document.getElementById("source-name-input"),
+    urlInput: document.getElementById("source-url-input"),
+    errorElement: document.getElementById("source-form-error"),
+    saveButton: document.getElementById("source-save-button"),
+    cancelButton: document.getElementById("source-cancel-button"),
+    deleteButton: document.getElementById("source-delete-button"),
+    normalizeUrl: window.IPTVSourceStore.normalizeUrl,
+    confirm: function (message) { return window.confirm(message); },
+    onSave: saveSourceForm,
+    onCancel: function () {
+      dispatch({ type: "SOURCE_FORM_CLOSED" });
+    },
+    onDelete: deleteSource,
+    onExit: exitApp
+  });
+
+  function applySourceConfig(source) {
+    activeSource = source || null;
+    PLAYLIST_URL = activeSource ? activeSource.url : "";
+    PLAYLIST_REQUEST = activeSource ? activeSource.request || {} : {};
+    EPG_URL = activeSource ? activeSource.epgUrl || "" : "";
+    EPG_REQUEST = activeSource ? activeSource.epgRequest || {} : {};
+  }
+
+  function getSourceViews() {
+    return sourceStore.getSources().map(function (source) {
+      return {
+        id: source.id,
+        name: source.name,
+        displayName: sourceStore.displayName(source),
+        url: source.url
+      };
+    });
+  }
+
+  function getActiveSourceIndex(sources) {
+    var activeId = activeSource ? activeSource.id : "";
+    for (var index = 0; index < sources.length; index += 1) {
+      if (sources[index].id === activeId) return index;
+    }
+    return 0;
+  }
+
+  function publishSources(options) {
+    options = options || {};
+    var sources = getSourceViews();
+    dispatch({
+      type: "SOURCES_UPDATED",
+      sources: sources,
+      activeSourceId: activeSource ? activeSource.id : "",
+      activeSourceIndex: getActiveSourceIndex(sources),
+      canAddSource: sourceStore.canAdd(),
+      preserveBrowser: Boolean(options.preserveBrowser)
+    });
+  }
+
+  function showSourceForm(mode, source, error, required) {
+    dispatch({ type: "SOURCE_FORM_OPENED" });
+    sourceFormView.show({
+      mode: mode,
+      source: source || null,
+      error: error || "",
+      required: Boolean(required)
+    });
+  }
+
+  function saveSourceForm(payload) {
+    var source;
+    var previousUrl = payload.source ? payload.source.url : "";
+    flushRememberedChannels();
+    try {
+      source = payload.mode === "edit"
+        ? sourceStore.update(payload.source.id, payload.value)
+        : sourceStore.add(payload.value);
+    } catch (error) {
+      sourceFormView.showError(error.message);
+      return;
+    }
+
+    sourceFormView.hide();
+    if (payload.mode === "edit" && previousUrl === source.url &&
+        activeSource && activeSource.id === source.id) {
+      applySourceConfig(source);
+      publishSources({ preserveBrowser: true });
+      dispatch({ type: "SOURCE_FORM_CLOSED" });
+      return;
+    }
+
+    loadPlaylist(source, {
+      openChannels: payload.mode === "edit",
+      reopenOnFailure: true
+    });
+  }
+
+  function deleteSource(source) {
+    flushRememberedChannels();
+    var storedActive = sourceStore.getActive();
+    var deletingActive = Boolean(
+      (activeSource && activeSource.id === source.id) ||
+      (storedActive && storedActive.id === source.id)
+    );
+    sourceStore.remove(source.id);
+    var nextSource = sourceStore.getActive();
+    if (!deletingActive) {
+      publishSources();
+      dispatch({ type: "SOURCE_FORM_CLOSED" });
+      return;
+    }
+
+    if (nextSource) {
+      stopCurrentSourcePlayback();
+      applySourceConfig(nextSource);
+      publishSources();
+      dispatch({ type: "ACTIVE_SOURCE_REMOVED" });
+      loadPlaylist(nextSource, { openChannels: true, reopenOnFailure: true });
+      return;
+    }
+
+    playlistLoadId += 1;
+    applySourceConfig(null);
+    stopCurrentSourcePlayback();
+    publishSources();
+    dispatch({ type: "PLAYLIST_UNCONFIGURED" });
+    showSourceForm("add", null, "", true);
+  }
+
+  function stopCurrentSourcePlayback() {
+    clearPlaybackTimers();
+    cancelPendingPlaybackSwitch();
+    player.pause();
+    player.removeAttribute("src");
+    player.load();
+    hasPlayedMedia = false;
+  }
 
   function getNumberOption(value, fallback, minimum, maximum) {
     var parsed = Number(value);
@@ -152,6 +308,23 @@
       case "EXIT_APP":
         exitApp();
         break;
+      case "OPEN_SOURCE_FORM":
+        showSourceForm(
+          currentEffect.mode,
+          currentEffect.mode === "edit" ? activeSource : null,
+          "",
+          !sourceStore.getSources().length
+        );
+        break;
+      case "LOAD_SOURCE":
+        var selectedSourceView = state.playlistSources[currentEffect.index];
+        var selectedSource = selectedSourceView
+          ? sourceStore.getById(selectedSourceView.id)
+          : null;
+        if (selectedSource) {
+          loadPlaylist(selectedSource, { openChannels: true, reopenOnFailure: true });
+        }
+        break;
       case "REMEMBER_CHANNEL":
         rememberChannel(state.channels[state.playingIndex], state.playingIndex);
         break;
@@ -189,14 +362,18 @@
   function renderState(previousState, event) {
     var panelIsOpen = state.uiMode === UI_MODE_CHANNELS;
     var uiIsHidden = state.uiMode === UI_MODE_HIDDEN;
+    var sourceFormIsOpen = state.uiMode === UI_MODE_SOURCE_FORM;
     var playingChannel = state.channels[state.playingIndex];
     var browserState = state.channelBrowser;
 
     uiLayer.classList.toggle("is-hidden", uiIsHidden);
+    uiLayer.classList.toggle("is-source-form-open", sourceFormIsOpen);
     channelPanelView.render({
       open: panelIsOpen,
       browserColumn: browserState.column,
       sources: state.playlistSources,
+      activeSourceId: state.activeSourceId,
+      canAddSource: state.canAddSource,
       channels: state.channels,
       selectedGroup: browserState.selectedGroup,
       focusedSourceIndex: browserState.focusedSourceIndex,
@@ -212,9 +389,13 @@
     });
 
     if (panelIsOpen && browserState.column === 0) {
-      okHintLabel.textContent = "选择播放源";
+      okHintLabel.textContent = browserState.focusedSourceIndex >= state.playlistSources.length
+        ? "添加播放源"
+        : "选择播放源";
     } else if (panelIsOpen && browserState.column === 1) {
-      okHintLabel.textContent = "选择分组";
+      okHintLabel.textContent = browserState.focusedGroupIndex === 0
+        ? "编辑播放源"
+        : "选择分组";
     } else if (panelIsOpen) {
       okHintLabel.textContent = "播放频道";
     } else if (
@@ -266,6 +447,7 @@
   }
 
   function exitApp() {
+    flushRememberedChannels();
     if (window.webOS && typeof window.webOS.platformBack === "function") {
       window.webOS.platformBack();
       return;
@@ -291,17 +473,22 @@
     return String(hash >>> 0);
   }
 
-  function getInitialChannelIndex(channels) {
-    var saved;
+  function getInitialChannelIndex(channels, source) {
+    var saved = source && source.lastChannel ? source.lastChannel : null;
     var matchedIndex = -1;
 
-    try {
-      saved = JSON.parse(window.localStorage.getItem(LAST_CHANNEL_STORAGE_KEY) || "null");
-    } catch (error) {
-      saved = null;
+    if (!saved) {
+      try {
+        var legacySaved = JSON.parse(window.localStorage.getItem(LAST_CHANNEL_STORAGE_KEY) || "null");
+        if (legacySaved && legacySaved.playlistKey === getPlaylistKey(source ? source.url : "")) {
+          saved = legacySaved;
+        }
+      } catch (error) {
+        saved = null;
+      }
     }
 
-    if (!saved || saved.playlistKey !== getPlaylistKey(PLAYLIST_URL)) return 0;
+    if (!saved) return 0;
 
     if (saved.channelId) {
       channels.some(function (channel, index) {
@@ -331,22 +518,28 @@
   }
 
   function rememberChannel(channel, index) {
-    if (!channel) return;
+    if (!channel || !activeSource) return;
+    pendingChannelMemories[activeSource.id] = {
+      id: activeSource.id,
+      channel: {
+        id: channel.id || "",
+        name: channel.name || "",
+        group: channel.group || ""
+      },
+      index: index
+    };
+    clearTimeout(channelRememberTimer);
+    channelRememberTimer = setTimeout(flushRememberedChannels, CHANNEL_REMEMBER_DELAY_MS);
+  }
 
-    try {
-      window.localStorage.setItem(
-        LAST_CHANNEL_STORAGE_KEY,
-        JSON.stringify({
-          playlistKey: getPlaylistKey(PLAYLIST_URL),
-          channelId: channel.id || "",
-          name: channel.name,
-          group: channel.group,
-          index: index
-        })
-      );
-    } catch (error) {
-      // Playback remains usable when storage is unavailable or full.
-    }
+  function flushRememberedChannels() {
+    clearTimeout(channelRememberTimer);
+    channelRememberTimer = null;
+    var entries = Object.keys(pendingChannelMemories).map(function (id) {
+      return pendingChannelMemories[id];
+    });
+    pendingChannelMemories = {};
+    if (entries.length) sourceStore.rememberChannels(entries);
   }
 
   function parseAttributes(line) {
@@ -423,10 +616,11 @@
     return channels;
   }
 
-  function buildPlaylistRequestOptions() {
+  function buildPlaylistRequestOptions(requestConfig) {
+    requestConfig = requestConfig || PLAYLIST_REQUEST;
     var options = {
-      method: (PLAYLIST_REQUEST.method || "GET").toUpperCase(),
-      cache: PLAYLIST_REQUEST.cache || "no-store"
+      method: (requestConfig.method || "GET").toUpperCase(),
+      cache: requestConfig.cache || "no-store"
     };
     var optionalFields = [
       "headers",
@@ -439,22 +633,23 @@
     ];
 
     optionalFields.forEach(function (field) {
-      if (PLAYLIST_REQUEST[field] !== undefined) {
-        options[field] = PLAYLIST_REQUEST[field];
+      if (requestConfig[field] !== undefined) {
+        options[field] = requestConfig[field];
       }
     });
 
     return options;
   }
 
-  function buildEpgRequestOptions() {
+  function buildEpgRequestOptions(requestConfig) {
+    requestConfig = requestConfig || EPG_REQUEST;
     var options = {
-      method: (EPG_REQUEST.method || "GET").toUpperCase(),
-      cache: EPG_REQUEST.cache || "no-store"
+      method: (requestConfig.method || "GET").toUpperCase(),
+      cache: requestConfig.cache || "no-store"
     };
     ["headers", "body", "credentials", "mode", "redirect", "referrer", "referrerPolicy"]
       .forEach(function (field) {
-        if (EPG_REQUEST[field] !== undefined) options[field] = EPG_REQUEST[field];
+        if (requestConfig[field] !== undefined) options[field] = requestConfig[field];
       });
     return options;
   }
@@ -583,31 +778,26 @@
     nowPlayingProgressValue.style.width = progress.toFixed(1) + "%";
   }
 
-  function loadEpg(url) {
+  function loadEpg(url, requestConfig, expectedLoadId) {
     if (!url) return;
     var requestUrl = url.replace(/\.gz(?=($|\?))/i, "");
-    fetch(requestUrl, buildEpgRequestOptions())
+    fetch(requestUrl, buildEpgRequestOptions(requestConfig))
       .then(function (response) {
         if (!response.ok) throw new Error("HTTP " + response.status);
         return response.text();
       })
       .then(function (text) {
+        if (expectedLoadId !== playlistLoadId) return;
         parseXmltv(text);
         renderState(state, { type: "EPG_READY" });
       })
       .catch(function () {
-        epgProgramsByChannel = {};
+        if (expectedLoadId === playlistLoadId) epgProgramsByChannel = {};
       });
   }
 
-  function getPlaylistDisplayName() {
-    if (playlistConfig.name) return playlistConfig.name;
-    try {
-      var parsed = new URL(PLAYLIST_URL);
-      return parsed.hostname || "当前 M3U";
-    } catch (error) {
-      return "当前 M3U";
-    }
+  function getPlaylistDisplayName(source) {
+    return sourceStore.displayName(source || activeSource || {});
   }
 
   function setConnectionState(label, stateClass) {
@@ -975,13 +1165,16 @@
     }
   }
 
-  function loadPlaylist() {
-    if (!PLAYLIST_URL) {
+  function loadPlaylist(source, options) {
+    options = options || {};
+    if (!source || !source.url) {
       dispatch({ type: "PLAYLIST_UNCONFIGURED" });
       return;
     }
 
-    fetch(PLAYLIST_URL, buildPlaylistRequestOptions())
+    var currentLoadId = ++playlistLoadId;
+    dispatch({ type: "PLAYLIST_LOADING" });
+    fetch(source.url, buildPlaylistRequestOptions(source.request))
       .then(function (response) {
         if (!response.ok) {
           throw new Error("HTTP " + response.status);
@@ -989,33 +1182,58 @@
         return response.text().then(function (text) {
           return {
             text: text,
-            baseUrl: response.url || PLAYLIST_URL
+            baseUrl: response.url || source.url
           };
         });
       })
       .then(function (playlist) {
+        if (currentLoadId !== playlistLoadId) return;
+        discoveredEpgUrl = "";
         var channels = parseM3U(playlist.text, playlist.baseUrl);
         if (!channels.length) {
           throw new Error("播放列表中没有频道");
         }
 
+        sourceStore.setActive(source.id);
+        var storedSource = sourceStore.getById(source.id) || source;
+        applySourceConfig(storedSource);
+        epgProgramsByChannel = {};
+        var sourceViews = getSourceViews();
         dispatch({
           type: "PLAYLIST_READY",
           channels: channels,
-          playlistName: getPlaylistDisplayName(),
-          initialIndex: getInitialChannelIndex(channels)
+          sources: sourceViews,
+          activeSourceId: storedSource.id,
+          activeSourceIndex: getActiveSourceIndex(sourceViews),
+          canAddSource: sourceStore.canAdd(),
+          playlistName: getPlaylistDisplayName(storedSource),
+          initialIndex: getInitialChannelIndex(channels, storedSource),
+          openChannels: Boolean(options.openChannels)
         });
-        loadEpg(EPG_URL || discoveredEpgUrl);
+        loadEpg(
+          storedSource.epgUrl || discoveredEpgUrl,
+          storedSource.epgRequest,
+          currentLoadId
+        );
       })
       .catch(function (error) {
+        if (currentLoadId !== playlistLoadId) return;
         dispatch({
           type: "PLAYLIST_FAILED",
           message: error.message + " · 请确认 M3U 数据源可访问"
         });
+        publishSources();
+        if (options.reopenOnFailure) {
+          showSourceForm("edit", sourceStore.getById(source.id) || source, error.message, false);
+        }
       });
   }
 
   document.addEventListener("keydown", function (event) {
+    if (sourceFormView.isOpen()) {
+      sourceFormView.handleKey(event);
+      return;
+    }
     var inputAt = getMonotonicTime();
     switch (event.keyCode) {
       case 37:
@@ -1151,6 +1369,12 @@
     });
   });
 
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) flushRememberedChannels();
+  });
+
+  window.addEventListener("pagehide", flushRememberedChannels);
+
   function updateClock() {
     var now = new Date();
     clock.textContent =
@@ -1163,5 +1387,11 @@
   renderState(state, { type: "INITIAL_RENDER" });
   updateClock();
   setInterval(updateClock, 30000);
-  loadPlaylist();
+  publishSources();
+  if (activeSource) {
+    loadPlaylist(activeSource, { openChannels: false, reopenOnFailure: false });
+  } else {
+    dispatch({ type: "PLAYLIST_UNCONFIGURED" });
+    showSourceForm("add", null, "", true);
+  }
 })();

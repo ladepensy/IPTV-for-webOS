@@ -41,6 +41,7 @@
     var onSelect = options.onSelect;
     var getInputTime = options.getInputTime;
     var renderedSources = null;
+    var renderedCanAddSource = null;
     var renderedChannels = null;
     var renderedGroupSignature = "";
     var sourceItems = [];
@@ -88,12 +89,16 @@
       return item;
     }
 
-    function setSources(sources) {
+    function setSources(sources, canAddSource) {
       var fragment = document.createDocumentFragment();
       sourceItems = [];
       sourceListElement.innerHTML = "";
       sources.forEach(function (source, index) {
-        var item = makeItem("browser-item source-item", source.name || "当前 M3U", "播放列表");
+        var item = makeItem(
+          "browser-item source-item",
+          source.displayName || source.name || "当前 M3U",
+          "M3U 播放源"
+        );
         item.setAttribute("data-index", String(index));
         item.addEventListener("mouseenter", function () { onSourceFocus(index); });
         item.addEventListener("focus", function () { onSourceFocus(index); });
@@ -101,8 +106,19 @@
         sourceItems.push(item);
         fragment.appendChild(item);
       });
+      if (canAddSource) {
+        var addIndex = sources.length;
+        var addItem = makeItem("browser-item source-item action-item", "＋ 添加播放源", "最多 10 个播放源");
+        addItem.setAttribute("data-index", String(addIndex));
+        addItem.addEventListener("mouseenter", function () { onSourceFocus(addIndex); });
+        addItem.addEventListener("focus", function () { onSourceFocus(addIndex); });
+        addItem.addEventListener("click", function () { onSourceSelect(addIndex); });
+        sourceItems.push(addItem);
+        fragment.appendChild(addItem);
+      }
       sourceListElement.appendChild(fragment);
       renderedSources = sources;
+      renderedCanAddSource = canAddSource;
       renderedFocusedSourceIndex = -1;
     }
 
@@ -115,13 +131,21 @@
       var fragment = document.createDocumentFragment();
       groupItems = [];
       groupListElement.innerHTML = "";
+      var editItem = makeItem("browser-item group-item action-item", "编辑此播放源", "修改名称、地址或删除");
+      editItem.setAttribute("data-index", "0");
+      editItem.addEventListener("mouseenter", function () { onGroupFocus(0); });
+      editItem.addEventListener("focus", function () { onGroupFocus(0); });
+      editItem.addEventListener("click", function () { onGroupSelect(0); });
+      groupItems.push(editItem);
+      fragment.appendChild(editItem);
       groups.forEach(function (group, index) {
         var count = countGroupChannels(channels, group);
         var item = makeItem("browser-item group-item", group, count + " 个频道");
-        item.setAttribute("data-index", String(index));
-        item.addEventListener("mouseenter", function () { onGroupFocus(index); });
-        item.addEventListener("focus", function () { onGroupFocus(index); });
-        item.addEventListener("click", function () { onGroupSelect(index); });
+        var rowIndex = index + 1;
+        item.setAttribute("data-index", String(rowIndex));
+        item.addEventListener("mouseenter", function () { onGroupFocus(rowIndex); });
+        item.addEventListener("focus", function () { onGroupFocus(rowIndex); });
+        item.addEventListener("click", function () { onGroupSelect(rowIndex); });
         groupItems.push(item);
         fragment.appendChild(item);
       });
@@ -224,7 +248,9 @@
       panelElement.setAttribute("aria-hidden", view.open ? "false" : "true");
       trackElement.setAttribute("data-column", String(view.browserColumn));
 
-      if (renderedSources !== view.sources) setSources(view.sources);
+      if (renderedSources !== view.sources || renderedCanAddSource !== view.canAddSource) {
+        setSources(view.sources, view.canAddSource);
+      }
       if (renderedChannels !== view.channels || renderedGroupSignature !== groupSignature) {
         setGroups(view.channels, groups);
       }
@@ -243,6 +269,10 @@
       } else {
         setItemState(sourceItems[view.focusedSourceIndex], "is-focused", view.browserColumn === 0);
       }
+      sourceItems.forEach(function (item, index) {
+        var source = view.sources[index];
+        setItemState(item, "is-selected", Boolean(source && source.id === view.activeSourceId));
+      });
 
       if (renderedFocusedGroupIndex !== view.focusedGroupIndex) {
         setItemState(groupItems[renderedFocusedGroupIndex], "is-focused", false);
@@ -250,7 +280,7 @@
       }
       groupItems.forEach(function (item, index) {
         setItemState(item, "is-focused", view.browserColumn === 1 && index === view.focusedGroupIndex);
-        setItemState(item, "is-selected", groups[index] === selectedGroup);
+        setItemState(item, "is-selected", index > 0 && groups[index - 1] === selectedGroup);
       });
 
       if (renderedFocusedIndex !== view.focusedIndex) {

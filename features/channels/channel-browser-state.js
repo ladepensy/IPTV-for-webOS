@@ -11,11 +11,11 @@
   var COLUMN_GROUPS = 1;
   var COLUMN_CHANNELS = 2;
 
-  function createInitialState(initialChannelIndex) {
+  function createInitialState(initialChannelIndex, initialSourceIndex) {
     return {
       column: COLUMN_SOURCES,
-      focusedSourceIndex: 0,
-      focusedGroupIndex: 0,
+      focusedSourceIndex: Math.max(0, Number(initialSourceIndex) || 0),
+      focusedGroupIndex: 1,
       focusedChannelIndex: Math.max(0, Number(initialChannelIndex) || 0),
       selectedGroup: "全部"
     };
@@ -57,8 +57,8 @@
 
   function enterFocusedGroup(next, channels) {
     var groups = getGroups(channels);
-    next.focusedGroupIndex = clamp(next.focusedGroupIndex, groups.length);
-    next.selectedGroup = groups[next.focusedGroupIndex] || "全部";
+    next.focusedGroupIndex = Math.max(1, clamp(next.focusedGroupIndex, groups.length + 1));
+    next.selectedGroup = groups[next.focusedGroupIndex - 1] || "全部";
     var visibleIndices = getVisibleChannelIndices(next, channels);
     if (visibleIndices.indexOf(next.focusedChannelIndex) < 0 && visibleIndices.length) {
       next.focusedChannelIndex = visibleIndices[0];
@@ -70,7 +70,7 @@
     if (next.column === COLUMN_SOURCES) {
       next.focusedSourceIndex = clamp(
         next.focusedSourceIndex + delta,
-        context.sources.length
+        context.sources.length + (context.canAddSource ? 1 : 0)
       );
       return;
     }
@@ -78,7 +78,7 @@
     if (next.column === COLUMN_GROUPS) {
       next.focusedGroupIndex = clamp(
         next.focusedGroupIndex + delta,
-        getGroups(context.channels).length
+        getGroups(context.channels).length + 1
       );
       return;
     }
@@ -100,7 +100,7 @@
 
     switch (event.type) {
       case "RESET":
-        return result(createInitialState(event.initialChannelIndex));
+        return result(createInitialState(event.initialChannelIndex, event.initialSourceIndex));
 
       case "OPEN":
         next.column = COLUMN_SOURCES;
@@ -118,14 +118,23 @@
 
       case "RIGHT":
         if (next.column === COLUMN_SOURCES) {
+          if (!context.sources[next.focusedSourceIndex]) return result(next);
           next.column = COLUMN_GROUPS;
           return result(next);
         }
-        if (next.column === COLUMN_GROUPS) enterFocusedGroup(next, context.channels);
+        if (next.column === COLUMN_GROUPS && next.focusedGroupIndex > 0) {
+          enterFocusedGroup(next, context.channels);
+        }
         return result(next);
 
       case "CONFIRM":
         if (next.column === COLUMN_SOURCES) {
+          if (!context.sources[next.focusedSourceIndex]) {
+            if (context.canAddSource && next.focusedSourceIndex === context.sources.length) {
+              return result(next, { type: "ADD_SOURCE" });
+            }
+            return result(next);
+          }
           next.column = COLUMN_GROUPS;
           return result(next, {
             type: "SOURCE_SELECTED",
@@ -133,10 +142,13 @@
           });
         }
         if (next.column === COLUMN_GROUPS) {
+          if (next.focusedGroupIndex === 0) {
+            return result(next, { type: "EDIT_SOURCE" });
+          }
           enterFocusedGroup(next, context.channels);
           return result(next, {
             type: "GROUP_SELECTED",
-            index: next.focusedGroupIndex,
+            index: next.focusedGroupIndex - 1,
             group: next.selectedGroup
           });
         }
@@ -146,30 +158,42 @@
         });
 
       case "SOURCE_FOCUS":
-        if (!context.sources[event.index]) return result(next);
+        if (!context.sources[event.index] &&
+            !(context.canAddSource && event.index === context.sources.length)) return result(next);
         next.column = COLUMN_SOURCES;
         next.focusedSourceIndex = event.index;
         return result(next);
 
       case "SOURCE_SELECT":
-        if (!context.sources[event.index]) return result(next);
+        if (!context.sources[event.index]) {
+          if (context.canAddSource && event.index === context.sources.length) {
+            next.focusedSourceIndex = event.index;
+            next.column = COLUMN_SOURCES;
+            return result(next, { type: "ADD_SOURCE" });
+          }
+          return result(next);
+        }
         next.focusedSourceIndex = event.index;
         next.column = COLUMN_GROUPS;
         return result(next, { type: "SOURCE_SELECTED", index: event.index });
 
       case "GROUP_FOCUS":
-        if (!groups[event.index]) return result(next);
+        if (event.index < 0 || event.index > groups.length) return result(next);
         next.column = COLUMN_GROUPS;
         next.focusedGroupIndex = event.index;
         return result(next);
 
       case "GROUP_SELECT":
-        if (!groups[event.index]) return result(next);
+        if (event.index < 0 || event.index > groups.length) return result(next);
         next.focusedGroupIndex = event.index;
+        if (event.index === 0) {
+          next.column = COLUMN_GROUPS;
+          return result(next, { type: "EDIT_SOURCE" });
+        }
         enterFocusedGroup(next, context.channels);
         return result(next, {
           type: "GROUP_SELECTED",
-          index: event.index,
+          index: event.index - 1,
           group: next.selectedGroup
         });
 
