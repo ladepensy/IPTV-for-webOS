@@ -1,5 +1,7 @@
 # Real TV workflow
 
+On Windows, use the native PowerShell 7 deployment command in `windows.md`; the generic CLI examples below remain useful for macOS/Linux and manual diagnosis.
+
 ## Register Developer Mode TV
 
 Require the Mac and TV to share a reachable network. In the TV's LG Developer Mode app:

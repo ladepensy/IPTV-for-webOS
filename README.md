@@ -108,6 +108,24 @@ node tests/channel-panel.test.js
 
 ### 启动应用
 
+在项目根目录可以使用仓库自带脚本一键校验并启动 Simulator。
+
+Windows 使用 PowerShell 7：
+
+```powershell
+& .\.agents\skills\webos-tv-debug\scripts\run-simulator.ps1 -Version 25 -AppDir .
+```
+
+macOS 使用终端：
+
+```bash
+./.agents/skills/webos-tv-debug/scripts/run-simulator.sh 25 "$(pwd -P)"
+```
+
+如果 Simulator 不在 webOS CLI 默认搜索目录，Windows 增加 `-SimulatorDir $env:WEBOS_SIMULATOR_DIR`，macOS 在命令末尾增加 `"$WEBOS_SIMULATOR_DIR"`。变量应指向包含 Simulator 可执行程序的已解压目录。
+
+以下是 webOS Studio 和原始 CLI 的手工启动方式，可用于排查脚本或 Simulator 路径问题。
+
 使用 webOS Studio：
 
 1. 在 VS Code 中打开本项目。
@@ -217,7 +235,23 @@ ares-device --system-info --device myTV
 
 ### 4. 打包、安装和启动
 
-在项目根目录运行：
+确认电视连接成功后，可以在项目根目录一键完成校验、打包、安装和启动。将 `myTV` 替换成 `ares-setup-device` 中注册的设备名。
+
+Windows 使用 PowerShell 7：
+
+```powershell
+& .\.agents\skills\webos-tv-debug\scripts\deploy-to-tv.ps1 -Device myTV -AppDir .
+```
+
+macOS 使用终端：
+
+```bash
+./.agents/skills/webos-tv-debug/scripts/deploy-to-tv.sh myTV "$(pwd -P)"
+```
+
+需要同时打开 Inspector 时，Windows 在命令末尾增加 `-Inspect`，macOS 增加 `--inspect`。部署脚本使用临时目录生成 IPK，不会为了覆盖安装而修改本地 `appinfo.json` 版本号。
+
+也可以手工依次运行：
 
 ```bash
 # 打包

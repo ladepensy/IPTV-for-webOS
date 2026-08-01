@@ -1,141 +1,111 @@
 # Windows workflow
 
-Use this reference on Windows. Read `privacy.md` first. Prefer Git Bash for webOS CLI work and bundled shell scripts; use PowerShell only for Windows-specific discovery or process inspection.
+Use this reference on Windows. Read `privacy.md` first. PowerShell 7 is the canonical Windows shell for this skill; do not route commands through Git Bash, WSL, or Windows PowerShell 5.1 unless the user explicitly asks.
 
-## Shell selection
+## Start PowerShell 7
 
-Use Git for Windows Bash, normally installed at:
-
-```text
-C:\Program Files\Git\bin\bash.exe
-```
-
-Do not use `C:\Windows\System32\bash.exe`; that executable launches WSL and is not Git Bash. When the active orchestration shell is PowerShell, start Git Bash explicitly and run the workflow inside it:
+Verify the active major version before doing project or device work:
 
 ```powershell
-& 'C:\Program Files\Git\bin\bash.exe' -lc 'cd /d/path/to/app && scripts/check-webos-project.sh .'
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    throw 'PowerShell 7 or newer is required. Start pwsh and retry.'
+}
 ```
 
-Keep every bundled `.sh` file LF-only. A failure containing `$'\r'`, `set: -\r`, or `do\r` means the script has CRLF line endings; normalize the repository-owned script before retrying.
+When `pwsh` is installed but the current terminal is Windows PowerShell, start it explicitly:
 
-## Prerequisites
+```powershell
+& 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile
+```
 
-Install:
+## Prerequisites and CLI discovery
 
-- Git for Windows
-- Node.js LTS
-- LG webOS TV Simulator for Windows when Simulator testing is needed
-- LG webOS CLI
+Install Node.js LTS, LG webOS CLI, and the LG webOS TV Simulator when Simulator testing is needed:
 
-Use a fresh Git Bash session after installing Node.js so PATH changes are visible:
-
-```bash
-npm install -g @webos-tools/cli
+```powershell
+npm install --global @webos-tools/cli
 ares --version
 ares-launch --version
 ares-package --version
 ```
 
-The current CLI requires a modern Node.js runtime. If `ares-package` fails with a missing `node:*` module, check `node --version` before changing the project.
+If npm's global command directory is not on the active PATH, add it only to the current PowerShell process, then verify commands without reporting the expanded account-bearing path:
+
+```powershell
+$npmCommandDir = Join-Path $env:APPDATA 'npm'
+if ($env:Path -notlike "*$npmCommandDir*") {
+    $env:Path = "$npmCommandDir;$env:Path"
+}
+Get-Command ares-launch, ares-package, ares-install, ares-device
+```
+
+The CLI requires a modern Node.js runtime. If `ares-package` reports a missing `node:*` module, verify `node --version` before changing the project.
 
 ## Local configuration
 
-Create the ignored local configuration from the public template. Do not print it or include it in logs, screenshots, packages for sharing, or commits.
+Create the ignored local configuration without printing its contents:
 
-```bash
-APP_DIR=$(pwd -P)
-cp "$APP_DIR/config.example.js" "$APP_DIR/config.js"
+```powershell
+Copy-Item -LiteralPath .\config.example.js -Destination .\config.js
 ```
 
-Verify the configured playlist and media endpoints are reachable from the target. For a real TV, `localhost` and `127.0.0.1` refer to the TV, not the Windows host.
+Verify the configured playlist and media endpoints are reachable from the target. On a real TV, `localhost` and `127.0.0.1` refer to the TV, not the Windows host.
 
-## Download and install Simulator
+## Validate and run a Simulator
 
-Download the Windows Simulator ZIP from LG's official Simulator Installation page and save it under a bounded, user-selected directory such as `$SIMULATOR_ROOT`. Unzip it so the extracted directory contains the platform executable, for example:
+Validate from the app directory:
 
-```text
-$SIMULATOR_ROOT\webOS_TV_25_Simulator_1.4.4\webOS_TV_25_Simulator_1.4.4.exe
+```powershell
+& .\.agents\skills\webos-tv-debug\scripts\check-webos-project.ps1 -AppDir .
 ```
 
-Do not treat the ZIP file, the app source directory, or a parent directory without the executable as `--simulator-path`.
+If the Simulator is installed in the CLI default location:
 
-## Validate and launch from Git Bash
-
-Validate before every launch or deployment:
-
-```bash
-APP_DIR=$(pwd -P)
-scripts/check-webos-project.sh "$APP_DIR"
+```powershell
+& .\.agents\skills\webos-tv-debug\scripts\run-simulator.ps1 -Version 25 -AppDir .
 ```
 
-Launch a Simulator from Git Bash:
+Otherwise, pass the verified extracted Simulator directory containing its Windows executable:
 
-```bash
-APP_DIR=$(pwd -P)
-: "${WEBOS_SIMULATOR_ROOT:?Set WEBOS_SIMULATOR_ROOT to the verified Simulator root first.}"
-SIMULATOR_DIR="$WEBOS_SIMULATOR_ROOT/webOS_TV_25_Simulator_1.4.4"
-
-ares-launch \
-  --simulator 25 \
-  --simulator-path "$SIMULATOR_DIR" \
-  "$APP_DIR"
+```powershell
+& .\.agents\skills\webos-tv-debug\scripts\run-simulator.ps1 `
+    -Version 25 `
+    -AppDir . `
+    -SimulatorDir $env:WEBOS_SIMULATOR_DIR
 ```
 
-If the Simulator is installed in the CLI's default search location, omit `--simulator-path`. Treat Simulator discovery, process launch, and app launch as separate outcomes.
-
-Use PowerShell only when Windows-native process verification is needed:
+Treat Simulator discovery, process launch, and app launch as separate outcomes. For a privacy-safe process check, inspect only the needed fields and do not report account-bearing command-line paths:
 
 ```powershell
 Get-CimInstance Win32_Process |
-  Where-Object { $_.Name -like '*Simulator*.exe' } |
-  Select-Object Name, ProcessId, CommandLine
+    Where-Object Name -Like '*Simulator*.exe' |
+    Select-Object Name, ProcessId
 ```
 
-Only inspect or report sanitized process information. Do not expose account-bearing paths or app configuration contents.
+## Deploy to a real TV
 
-## Real TV from Git Bash
+Register the Developer Mode TV with `ares-setup-device`. Use port `9922`, user `prisoner`, and an empty SSH password. Keep **Dev Mode Status**, **Key Server**, and the session lifetime active. Retrieve the key without echoing its passphrase:
 
-Register the TV with the Developer Mode defaults:
-
-```bash
-ares-setup-device
-```
-
-Use port `9922`, user `prisoner`, and an empty SSH password. Keep the TV's Developer Mode **Dev Mode Status**, **Key Server**, and session lifetime active. Retrieve the key without echoing the passphrase:
-
-```bash
+```powershell
 ares-novacom --device myTV --getkey
 ares-device --device myTV --system-info
 ```
 
-Prefer the bundled deployment script after explicit user authorization:
+After the user explicitly authorizes installation and launch, use the native deployment script:
 
-```bash
-APP_DIR=$(pwd -P)
-DEVICE=myTV
-scripts/deploy-to-tv.sh "$DEVICE" "$APP_DIR"
+```powershell
+& .\.agents\skills\webos-tv-debug\scripts\deploy-to-tv.ps1 -Device myTV -AppDir .
 ```
 
-For manual diagnosis, keep package, install, launch, running-state verification, and Inspector as distinct steps. Close an old running instance before reinstalling a changed package, and preserve the existing `appinfo.json` version during routine real-TV testing. See `real-device.md` for the clean-reinstall fallback and its data-loss guardrail.
+Add `-Inspect` only when opening the Inspector is requested. The script validates, packages to a private temporary directory, closes the old instance, installs the same-version IPK, launches, verifies the running state, and removes the temporary package. It never rewrites `appinfo.json` and does not uninstall the existing app.
 
-```bash
-TASK_TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/webos-manual.XXXXXX")
-trap 'rm -rf -- "$TASK_TMP_DIR"' EXIT
-ares-package . --outdir "$TASK_TMP_DIR"
-ares-launch --close APP_ID --device "$DEVICE" || true
-ares-install --device "$DEVICE" "$TASK_TMP_DIR/APP_ID_VERSION_all.ipk"
-ares-launch --device "$DEVICE" APP_ID
-sleep 5
-ares-launch --running --device "$DEVICE"
-```
-
-Do not install, remove, or launch on a real TV unless the user requested that state change.
+If installation is rejected because the installed version differs, stop and report it. Uninstalling can erase app-local data and requires explicit authorization; follow `real-device.md` for that fallback.
 
 ## Common Windows failures
 
-- `ares-launch` requests `--simulator-path`: the requested Simulator version was not found in CLI defaults; provide the verified extracted directory.
-- A bundled script reports `$'\r'` or `set: -\r`: its line endings are CRLF; convert the repository-owned `.sh` file to LF and preserve it with `.gitattributes`.
-- `ares-package` reports a missing `node:*` module: the active Node.js runtime is too old; upgrade Node.js LTS and open a new Git Bash session.
-- Install reports success but the TV still shows old code: verify the generated IPK filename, close the old instance, reinstall the same-version IPK, relaunch, and confirm the running state. Do not change `appinfo.json` automatically; use the explicitly authorized clean-reinstall fallback from `real-device.md` if needed.
+- A script is rejected by execution policy: run it in PowerShell 7 with a process-scoped policy only if the user permits, for example `Set-ExecutionPolicy -Scope Process Bypass`; do not change the machine policy automatically.
+- `ares-launch` requests `--simulator-path`: provide the verified extracted Simulator directory, not the ZIP or app source directory.
+- `ares-package` reports a missing `node:*` module: upgrade Node.js LTS and open a fresh PowerShell 7 session.
+- Install succeeds but old code appears: close the old instance, reinstall the same-version IPK, relaunch, and verify running state. Do not modify `appinfo.json` merely to force an update.
 - Key retrieval fails: verify Developer Mode status, Key Server, session expiry, port `9922`, user `prisoner`, network reachability, and passphrase case.
 - The playlist loads but video fails in Simulator: inspect `MediaError`, container, codec, and network state; do not infer a network failure solely from Simulator media limitations.
