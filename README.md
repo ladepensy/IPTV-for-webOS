@@ -1,4 +1,6 @@
-# LG webOS IPTV
+# IPTV for webOS
+
+*A lightweight IPTV player built for LG webOS TV.*
 
 一个面向 LG webOS TV 的轻量 IPTV Web App。应用可从任意可访问的 HTTP/HTTPS 数据源获取 M3U 播放列表，并通过电视原生媒体能力播放其中的频道。
 
