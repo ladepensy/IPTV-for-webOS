@@ -22,37 +22,48 @@
 
       <div id="ui-layer" class="ui-layer">
         <header class="topbar">
-          <div>
-            <p class="eyebrow">LG webOS IPTV</p>
-            <h1 id="current-title">正在载入频道…</h1>
+          <div class="brand-lockup">
+            <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div>
+              <p class="eyebrow">Home IPTV</p>
+              <h1 id="current-title">正在载入频道…</h1>
+            </div>
           </div>
           <div class="topbar-status">
-            <span id="clock">--:--</span>
-            <span id="connection-state" class="status-pill">连接中</span>
+            <span id="connection-state" class="status-pill"><span class="status-dot" aria-hidden="true"></span>连接中</span>
+            <span id="clock" class="clock">--:--</span>
           </div>
         </header>
 
         <aside id="channel-panel" class="channel-panel" aria-label="频道列表" aria-hidden="true">
           <div class="panel-heading">
-            <span>频道</span>
-            <span id="channel-count">0</span>
+            <div>
+              <p class="eyebrow">频道库</p>
+              <strong>全部频道</strong>
+            </div>
+            <span id="channel-count" class="channel-count">0</span>
+          </div>
+          <div class="panel-toolbar">
+            <span>使用 ↑ ↓ 选择</span>
+            <span class="panel-live"><span class="status-dot" aria-hidden="true"></span>实时</span>
           </div>
           <div id="channel-list" class="channel-list" role="listbox"></div>
         </aside>
 
         <div class="now-playing">
-          <div>
+          <div class="now-playing-copy">
             <p class="eyebrow">正在播放</p>
             <h2 id="now-playing-title">正在载入频道…</h2>
+            <p id="now-playing-group">按 → 浏览频道库</p>
           </div>
-          <p id="now-playing-group">按 → 打开频道列表</p>
+          <div class="now-playing-badge"><span class="live-pulse" aria-hidden="true"></span><span>LIVE</span></div>
         </div>
 
         <footer>
-          <span><kbd>→</kbd> 打开频道</span>
-          <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
-          <span><kbd>OK</kbd> 播放</span>
-          <span><kbd>BACK</kbd> 收起/退出</span>
+          <span class="hint"><kbd>→</kbd><span>频道库</span></span>
+          <span class="hint"><kbd>↑</kbd><kbd>↓</kbd><span>选择</span></span>
+          <span class="hint"><kbd>OK</kbd><span>播放</span></span>
+          <span class="hint"><kbd>BACK</kbd><span>返回</span></span>
         </footer>
       </div>
     </main>

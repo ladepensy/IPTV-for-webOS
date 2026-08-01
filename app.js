@@ -416,6 +416,7 @@
 
     channels.forEach(function (channel, index) {
       var item = document.createElement("button");
+      var art = document.createElement("span");
       var number = document.createElement("span");
       var copy = document.createElement("span");
       var name = document.createElement("span");
@@ -425,6 +426,21 @@
       item.className = "channel-item";
       item.setAttribute("role", "option");
       item.setAttribute("data-index", String(index));
+
+      art.className = "channel-art";
+      if (channel.logo) {
+        var logo = document.createElement("img");
+        logo.alt = "";
+        logo.loading = "lazy";
+        logo.src = channel.logo;
+        logo.addEventListener("error", function () {
+          logo.remove();
+          art.textContent = (channel.name || "?").slice(0, 1).toUpperCase();
+        });
+        art.appendChild(logo);
+      } else {
+        art.textContent = (channel.name || "?").slice(0, 1).toUpperCase();
+      }
 
       number.className = "channel-number";
       number.textContent = String(index + 1).padStart(3, "0");
@@ -437,6 +453,7 @@
 
       copy.appendChild(name);
       copy.appendChild(group);
+      item.appendChild(art);
       item.appendChild(number);
       item.appendChild(copy);
       item.addEventListener("mouseenter", function () {
