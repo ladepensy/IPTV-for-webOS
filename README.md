@@ -16,7 +16,7 @@
 - 自动读取 M3U 首行 `x-tvg-url` 指向的 XMLTV 节目单，也支持通过配置覆盖 EPG 地址
 - 启动后自动播放上次选择的频道；没有有效记录时播放当前列表第一个频道
 - 5 秒没有遥控器或 Magic Remote 操作后自动隐藏界面，视频继续播放
-- 支持遥控器方向键、OK 和 Back
+- 使用 Enact Spotlight 管理电视端 DOM 焦点、5-way 导航和焦点恢复；业务选择、切列、Back 与播放仍由现有状态机管理
 - 支持鼠标点击，方便在浏览器和 Simulator 中调试
 - 使用原生 `<video>` 播放 rtp2httpd 提供的 HTTP 视频流
 - 连续上/下换台会合并为最后一次请求，避免反复重建媒体连接
@@ -33,7 +33,7 @@
 ├── styles.css     # 电视端全局界面样式
 ├── src/
 │   ├── core/      # TypeScript：M3U、XMLTV、播放源和频道浏览状态
-│   ├── ui/        # React：频道库和播放源表单
+│   ├── ui/        # React：频道库、播放源表单和 Enact Spotlight 适配
 │   └── main.tsx   # 新核心、React UI 与旧播放控制器的兼容装配
 ├── features/
 │   ├── channels/

@@ -109,6 +109,8 @@
 
 .browser-list::-webkit-scrollbar { display: none; }
 
+.spotlight-list-content { min-height: 100%; }
+
 .browser-item {
   position: relative;
   display: flex;
@@ -140,7 +142,8 @@
   opacity: 0;
 }
 
-.browser-item.is-focused {
+.browser-item.is-focused,
+.browser-item:focus {
   border-color: rgba(255, 255, 255, 0.9);
   background: rgba(255, 255, 255, 0.12);
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.14), 0 10px 24px rgba(0, 0, 0, 0.16);

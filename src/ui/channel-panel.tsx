@@ -1,8 +1,13 @@
-import {memo, useLayoutEffect, useRef} from "react";
+import {memo, type FocusEvent} from "react";
 import {createRoot, type Root} from "react-dom/client";
 import {flushSync} from "react-dom";
 import {getGroups} from "../core/channel-browser-state";
 import type {Channel, Program, SourceView} from "../core/types";
+import {
+  BrowserSpotlightContainer,
+  focusWithSpotlight,
+  SpotlightButton
+} from "./spotlight";
 
 interface ChannelPanelView {
   open: boolean;
@@ -55,19 +60,22 @@ const SourceItem = memo(function SourceItem(props: {
   onFocus: (index: number) => void;
   onSelect: (index: number) => void;
 }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  useLayoutEffect(() => { if (props.focused) ref.current?.scrollIntoView({block: "nearest"}); }, [props.focused]);
-  return <button ref={ref} type="button" role="option" aria-selected={props.focused}
+  const handleFocus = (event: FocusEvent<HTMLButtonElement>) => {
+    event.currentTarget.scrollIntoView({block: "nearest"});
+    props.onFocus(props.index);
+  };
+  return <SpotlightButton type="button" role="option" aria-selected={props.focused}
+    spotlightId={`source-${props.index}`}
     data-index={props.index}
     className={itemClass(`source-item${props.add ? " action-item" : ""}`, props.focused, props.selected)}
-    onMouseEnter={() => props.onFocus(props.index)} onFocus={() => props.onFocus(props.index)}
+    onMouseEnter={() => props.onFocus(props.index)} onFocus={handleFocus}
     onClick={() => props.onSelect(props.index)}>
     <span className="item-accent" />
     <span className="item-copy">
       <span className="item-title">{props.add ? "＋ 添加播放源" : props.source?.displayName || props.source?.name || "当前 M3U"}</span>
       <span className="item-meta">{props.add ? "最多 10 个播放源" : "M3U 播放源"}</span>
     </span>
-  </button>;
+  </SpotlightButton>;
 });
 
 const GroupItem = memo(function GroupItem(props: {
@@ -80,19 +88,22 @@ const GroupItem = memo(function GroupItem(props: {
   onFocus: (index: number) => void;
   onSelect: (index: number) => void;
 }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  useLayoutEffect(() => { if (props.focused) ref.current?.scrollIntoView({block: "nearest"}); }, [props.focused]);
-  return <button ref={ref} type="button" role="option" aria-selected={props.focused}
+  const handleFocus = (event: FocusEvent<HTMLButtonElement>) => {
+    event.currentTarget.scrollIntoView({block: "nearest"});
+    props.onFocus(props.index);
+  };
+  return <SpotlightButton type="button" role="option" aria-selected={props.focused}
+    spotlightId={`group-${props.index}`}
     data-index={props.index}
     className={itemClass(`group-item${props.edit ? " action-item" : ""}`, props.focused, props.selected)}
-    onMouseEnter={() => props.onFocus(props.index)} onFocus={() => props.onFocus(props.index)}
+    onMouseEnter={() => props.onFocus(props.index)} onFocus={handleFocus}
     onClick={() => props.onSelect(props.index)}>
     <span className="item-accent" />
     <span className="item-copy">
       <span className="item-title">{props.name}</span>
       <span className="item-meta">{props.edit ? "修改名称、地址或删除" : `${props.count} 个频道`}</span>
     </span>
-  </button>;
+  </SpotlightButton>;
 });
 
 const ChannelItem = memo(function ChannelItem(props: {
@@ -105,14 +116,15 @@ const ChannelItem = memo(function ChannelItem(props: {
   onSelect: (index: number, inputAt: number) => void;
   getInputTime: () => number;
 }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  useLayoutEffect(() => {
-    if (props.focused && props.shouldScroll) ref.current?.scrollIntoView({block: "nearest"});
-  }, [props.focused, props.shouldScroll]);
+  const handleFocus = (event: FocusEvent<HTMLButtonElement>) => {
+    event.currentTarget.scrollIntoView({block: "nearest"});
+    props.onFocus(props.index);
+  };
   const initial = (props.channel.name || "?").slice(0, 1).toUpperCase();
-  return <button ref={ref} type="button" role="option" aria-selected={props.focused}
+  return <SpotlightButton type="button" role="option" aria-selected={props.focused}
+    spotlightId={`channel-${props.index}`}
     data-index={props.index} className={itemClass("channel-item", props.focused, false, props.playing)}
-    onMouseEnter={() => props.onFocus(props.index)} onFocus={() => props.onFocus(props.index)}
+    onMouseEnter={() => props.onFocus(props.index)} onFocus={handleFocus}
     onClick={() => props.onSelect(props.index, props.getInputTime())}>
     <span className="item-accent" />
     <span className="channel-number">{props.index + 1}</span>
@@ -126,7 +138,7 @@ const ChannelItem = memo(function ChannelItem(props: {
       <span className="item-title">{props.channel.name}</span>
       <span className="item-meta">{props.channel.group}</span>
     </span>
-  </button>;
+  </SpotlightButton>;
 });
 
 function formatTime(value: Date): string {
@@ -163,22 +175,25 @@ export function createChannelPanel(options: PanelOptions) {
     options.epgTitleElement.textContent = focusedChannel?.name || "当前频道";
 
     flushSync(() => {
-      roots[0].render(<>{view.sources.map((source, index) => <SourceItem key={source.id} source={source} index={index}
+      roots[0].render(<BrowserSpotlightContainer className="spotlight-list-content" spotlightId="source-list-container"
+        spotlightDisabled={!view.open || view.browserColumn !== 0}>{view.sources.map((source, index) => <SourceItem key={source.id} source={source} index={index}
         focused={view.open && view.browserColumn === 0 && index === view.focusedSourceIndex}
         selected={source.id === view.activeSourceId} onFocus={onSourceFocus} onSelect={onSourceSelect} />)}
         {view.canAddSource && <SourceItem key="add" index={view.sources.length} add focused={view.open && view.browserColumn === 0 && view.focusedSourceIndex === view.sources.length}
-          selected={false} onFocus={onSourceFocus} onSelect={onSourceSelect} />}</>);
-      roots[1].render(<><GroupItem key="edit" index={0} name="编辑此播放源" edit
+          selected={false} onFocus={onSourceFocus} onSelect={onSourceSelect} />}</BrowserSpotlightContainer>);
+      roots[1].render(<BrowserSpotlightContainer className="spotlight-list-content" spotlightId="group-list-container"
+        spotlightDisabled={!view.open || view.browserColumn !== 1}><GroupItem key="edit" index={0} name="编辑此播放源" edit
         focused={view.open && view.browserColumn === 1 && view.focusedGroupIndex === 0} selected={false}
         onFocus={onGroupFocus} onSelect={onGroupSelect} />
         {groups.map((group, index) => <GroupItem key={group} index={index + 1} name={group}
           count={group === "全部" ? view.channels.length : view.channels.filter((channel) => channel.group === group).length}
           focused={view.open && view.browserColumn === 1 && view.focusedGroupIndex === index + 1}
-          selected={group === selectedGroup} onFocus={onGroupFocus} onSelect={onGroupSelect} />)}</>);
-      roots[2].render(<>{visibleChannels.map(({channel, index}) => <ChannelItem key={`${channel.id}-${channel.url}-${index}`}
+          selected={group === selectedGroup} onFocus={onGroupFocus} onSelect={onGroupSelect} />)}</BrowserSpotlightContainer>);
+      roots[2].render(<BrowserSpotlightContainer className="spotlight-list-content" spotlightId="channel-list-container"
+        spotlightDisabled={!view.open || view.browserColumn !== 2}>{visibleChannels.map(({channel, index}) => <ChannelItem key={`${channel.id}-${channel.url}-${index}`}
         channel={channel} index={index} focused={view.open && view.browserColumn === 2 && index === view.focusedIndex}
         playing={index === view.playingIndex} shouldScroll={Boolean(view.shouldScroll)}
-        onFocus={options.onFocus} onSelect={options.onSelect} getInputTime={options.getInputTime} />)}</>);
+        onFocus={options.onFocus} onSelect={options.onSelect} getInputTime={options.getInputTime} />)}</BrowserSpotlightContainer>);
       const now = Date.now();
       roots[3].render(<>{focusedChannel && (!(view.programs || []).length
         ? <div className="epg-empty">暂无节目单</div>
@@ -187,6 +202,13 @@ export function createChannelPanel(options: PanelOptions) {
           <span className="epg-time">{formatTime(program.start)}</span><span className="epg-title">{program.title || "未命名节目"}</span>
         </div>))}</>);
     });
+
+    if (view.open) {
+      const activeList = [options.sourceListElement, options.groupListElement, channelList][view.browserColumn];
+      const focusedElement = activeList?.querySelector<HTMLElement>(".browser-item.is-focused") || null;
+      if (view.shouldScroll) focusedElement?.scrollIntoView({block: "nearest"});
+      focusWithSpotlight(focusedElement);
+    }
   }
 
   return {render};

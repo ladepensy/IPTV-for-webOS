@@ -77,11 +77,15 @@ Back 的层级固定为：`channels/info → hidden → 系统退出确认`。�
  channelPanel.render()
 ```
 
-M3U、分组和频道列的导航与确认由 `features/channels/channel-browser-state.js` 管理。主状态机只在收到 `CHANNEL_SELECTED` 时执行选台和播放副作用；`SOURCE_SELECTED` 与 `GROUP_SELECTED` 不会进入播放路径。
+M3U、分组和频道列的业务焦点、切列与确认由 `src/core/channel-browser-state.ts` 管理。主状态机只在收到 `CHANNEL_SELECTED` 时执行选台和播放副作用；`SOURCE_SELECTED` 与 `GROUP_SELECTED` 不会进入播放路径。
 
 三级频道库的 DOM 创建、列位移、焦点样式、播放标记、节目单浮窗和滚动由
-`features/channels/channel-panel.js` 独立负责。组件只接收状态快照，并把焦点和选择
-转换成回调；它不直接修改应用状态，也不控制播放器。
+`src/ui/channel-panel.tsx` 独立负责。组件只接收状态快照，并把焦点和选择转换成回调；
+它不直接修改应用状态，也不控制播放器。
+
+Enact Spotlight 管理实际 DOM 焦点、当前列内的上/下 5-way 移动、OK 模拟点击、Pointer 模式和焦点恢复。播放源、分组和频道分别使用独立容器，非当前列容器会被禁用，左/右离开容器则交回主状态机处理。Spotlight 的 `onFocus` 会转换为 `SOURCE_FOCUS`、`GROUP_FOCUS` 或 `CHANNEL_FOCUS`，因此 DOM 焦点始终回写到频道库子状态；Page Up/Page Down、滚轮或切列引起的状态变化则由组件反向恢复到对应 DOM 节点。
+
+播放源表单使用单独的 Spotlight 容器管理输入框和按钮导航。Back、必填表单退出确认、保存、删除及表单关闭后的返回位置仍由原有应用状态和副作用处理。
 
 频道库打开期间，底部 `now-playing` info 始终使用频道列聚焦状态下的固定左边界和宽度。播放源、分组、频道三列之间切换只移动频道库，不再改变 info 的长度。
 

@@ -7,12 +7,15 @@ import {parseM3U} from "./core/m3u";
 import {parseXmltv} from "./core/xmltv";
 import {channelPanelApi} from "./ui/channel-panel";
 import {sourceFormApi} from "./ui/source-form";
+import {initializeSpotlight, spotlightApi} from "./ui/spotlight";
 
+initializeSpotlight();
 window.IPTVChannelBrowserState = channelBrowserApi;
 window.IPTVSourceStore = sourceStoreApi;
 window.IPTVCore = {parseM3U, parseXmltv};
 window.IPTVChannelPanel = channelPanelApi;
 window.IPTVSourceForm = sourceFormApi;
+window.IPTVSpotlight = spotlightApi;
 
 function loadClassicScript(relativeUrl: string, optional = false): Promise<void> {
   return new Promise((resolve, reject) => {

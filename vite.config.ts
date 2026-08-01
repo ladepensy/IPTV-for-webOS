@@ -3,6 +3,8 @@ import {resolve} from "node:path";
 import react from "@vitejs/plugin-react";
 import {defineConfig, type Plugin} from "vite";
 
+const ramdaEsmDirectory = resolve(process.cwd(), "node_modules", "ramda", "es");
+
 function copyWebOsAssets(): Plugin {
   return {
     name: "copy-webos-assets",
@@ -21,6 +23,13 @@ function copyWebOsAssets(): Plugin {
 export default defineConfig({
   base: "./",
   plugins: [react(), copyWebOsAssets()],
+  resolve: {
+    alias: [
+      // Enact 4 imports Ramda's generated CommonJS files directly. Use Ramda's
+      // equivalent official ESM build so Rollup never parses its invalid PURE annotations.
+      {find: /^ramda\/src\/(.+)$/, replacement: `${ramdaEsmDirectory}/$1.js`}
+    ]
+  },
   build: {
     target: "es2015",
     outDir: "dist",

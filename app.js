@@ -1106,6 +1106,11 @@
       return;
     }
     var inputAt = getMonotonicTime();
+    var spotlightOwnsKey = state.uiMode === UI_MODE_CHANNELS &&
+      (event.keyCode === 38 || event.keyCode === 40 || event.keyCode === 13) &&
+      window.IPTVSpotlight &&
+      window.IPTVSpotlight.isSpottableTarget(event.target);
+    if (spotlightOwnsKey) return;
     switch (event.keyCode) {
       case 37:
         event.preventDefault();

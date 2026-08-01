@@ -1,6 +1,7 @@
 import {createRoot} from "react-dom/client";
 import {flushSync} from "react-dom";
 import type {PlaylistSource} from "../core/types";
+import {focusWithSpotlight, FormSpotlightContainer, SpotlightButton, SpotlightInput} from "./spotlight";
 
 interface FormValue { name: string; url: string }
 interface FormSettings {
@@ -73,7 +74,7 @@ export function createSourceForm(options: SourceFormOptions) {
   }
 
   function render(): void {
-    flushSync(() => root.render(<div className="source-form-card" key={renderKey}>
+    flushSync(() => root.render(<FormSpotlightContainer className="source-form-card" spotlightId="source-form-container" key={renderKey}>
       <p className="eyebrow">播放源</p>
       <h2 id="source-form-title">{mode === "edit" ? "编辑播放源" : "添加播放源"}</h2>
       <p id="source-form-subtitle" className="source-form-subtitle">
@@ -81,22 +82,23 @@ export function createSourceForm(options: SourceFormOptions) {
       </p>
       <div className="source-form-fields">
         <label className="source-field"><span>名称（可选）</span>
-          <input id="source-name-input" type="text" maxLength={60} autoComplete="off" defaultValue={initial.name} placeholder="例如：家庭 IPTV" />
+          <SpotlightInput id="source-name-input" type="text" maxLength={60} autoComplete="off" defaultValue={initial.name}
+            placeholder="例如：家庭 IPTV" />
         </label>
         <label className="source-field"><span>M3U 地址（必填）</span>
-          <input id="source-url-input" type="url" inputMode="url" autoComplete="off" spellCheck={false}
+          <SpotlightInput id="source-url-input" type="url" inputMode="url" autoComplete="off" spellCheck={false}
             defaultValue={initial.url} placeholder="http://server/playlist.m3u" />
         </label>
       </div>
       <p id="source-form-error" className="source-form-error" role="alert" hidden={!error}>{error}</p>
       <div className="source-form-actions">
-        <button id="source-save-button" className="source-form-button is-primary" type="button" onClick={submit}>
+        <SpotlightButton id="source-save-button" spotlightId="source-save" className="source-form-button is-primary" type="button" onClick={submit}>
           {mode === "edit" ? "保存修改" : "添加并播放"}
-        </button>
-        {!required && <button id="source-cancel-button" className="source-form-button" type="button" onClick={cancel}>取消</button>}
-        {mode === "edit" && <button id="source-delete-button" className="source-form-button is-danger" type="button" onClick={remove}>删除播放源</button>}
+        </SpotlightButton>
+        {!required && <SpotlightButton id="source-cancel-button" spotlightId="source-cancel" className="source-form-button" type="button" onClick={cancel}>取消</SpotlightButton>}
+        {mode === "edit" && <SpotlightButton id="source-delete-button" spotlightId="source-delete" className="source-form-button is-danger" type="button" onClick={remove}>删除播放源</SpotlightButton>}
       </div>
-    </div>));
+    </FormSpotlightContainer>));
   }
 
   function show(settings: FormSettings): void {
@@ -110,7 +112,7 @@ export function createSourceForm(options: SourceFormOptions) {
     options.rootElement.classList.add("is-open");
     options.rootElement.setAttribute("aria-hidden", "false");
     render();
-    setTimeout(() => (initial.name ? nameInput() : urlInput())?.focus(), 0);
+    setTimeout(() => focusWithSpotlight(initial.name ? nameInput() : urlInput()), 0);
   }
 
   function hide(): void {
@@ -138,20 +140,7 @@ export function createSourceForm(options: SourceFormOptions) {
       cancel();
       return true;
     }
-    if (code === 13) {
-      if (event.target === nameInput() || event.target === urlInput()) return false;
-      event.preventDefault();
-      if (document.activeElement instanceof HTMLElement) document.activeElement.click();
-      return true;
-    }
-    if (code !== 38 && code !== 40) return false;
-    event.preventDefault();
-    const controls = Array.from(options.rootElement.querySelectorAll<HTMLElement>("input, button:not([hidden])"));
-    let index = controls.indexOf(document.activeElement as HTMLElement);
-    if (index < 0) index = 0;
-    index = Math.max(0, Math.min(controls.length - 1, index + (code === 38 ? -1 : 1)));
-    controls[index]?.focus();
-    return true;
+    return false;
   }
 
   return {show, hide, showError, isOpen: () => open, handleKey};
