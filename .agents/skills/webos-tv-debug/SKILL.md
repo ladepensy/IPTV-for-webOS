@@ -41,6 +41,7 @@ Failure of any check is a hard stop. Do not continue by assumption, and do not c
 - Treat Simulator launch, package creation, installation, launch, and Inspector as distinct steps. Do not claim later steps succeeded from an earlier command.
 - Do not diagnose a reachable `video/mp2t` stream as a network failure merely because Simulator playback fails.
 - Do not install, remove, or launch an app on a real TV unless the user requested that state change.
+- Preserve the existing `appinfo.json` version during real-TV testing and deployment. Never change the local version solely to force an install or bypass caching; change it only when the user explicitly requests a version change or release.
 - Keep Developer Mode port `9922` and user `prisoner` distinct from emulator defaults.
 - Prefer explicit `--simulator-path` when the Simulator is outside the SDK search directory.
 - On Windows, keep bundled `.sh` files LF-only and run them with the verified Git for Windows `bash.exe`. If Bash reports `$'\r'` or `set: -\r`, fix the repository-owned script line endings before retrying rather than repeatedly wrapping the script at runtime.

@@ -65,11 +65,17 @@ state = send(state, { type: "KEY_DOWN", delta: 1 }).state;
 assert.strictEqual(state.channelBrowser.focusedChannelIndex, 2);
 assert.strictEqual(state.playingIndex, 1);
 
-outcome = send(state, { type: "KEY_OK" });
+outcome = send(state, { type: "KEY_OK", inputAt: 456 });
 state = outcome.state;
 assert.strictEqual(state.uiMode, constants.UI_MODE_INFO);
 assert.strictEqual(state.playingIndex, 2);
 assert.ok(outcome.effects.some(function (item) { return item.type === "START_PLAYBACK"; }));
+assert.ok(!outcome.effects.some(function (item) { return item.type === "SCHEDULE_PLAYBACK_SWITCH"; }));
+var okPlaybackEffect = outcome.effects.filter(function (item) {
+  return item.type === "START_PLAYBACK";
+})[0];
+assert.strictEqual(okPlaybackEffect.source, "remote-ok");
+assert.strictEqual(okPlaybackEffect.inputAt, 456);
 
 outcome = send(state, { type: "KEY_BACK" });
 assert.strictEqual(outcome.effects[0].type, "CANCEL_UI_HIDE");

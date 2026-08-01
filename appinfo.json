@@ -1,6 +1,6 @@
 {
   "id": "com.odyssey.webos.iptv",
-  "version": "0.1.2",
+  "version": "0.1.0",
   "vendor": "Odyssey",
   "type": "web",
   "main": "index.html",

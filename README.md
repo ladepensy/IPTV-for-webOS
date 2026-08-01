@@ -309,7 +309,7 @@ window.IPTV_CONFIG = {
     stallTimeoutMs: 12000,
     maxRetries: 2,
     retryDelayMs: 1200,
-    channelSwitchDelayMs: 220,
+    channelSwitchDelayMs: 100,
     loadingIndicatorDelayMs: 500
   },
   ui: {

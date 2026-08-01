@@ -116,7 +116,7 @@ DEVICE=myTV
 scripts/deploy-to-tv.sh "$DEVICE" "$APP_DIR"
 ```
 
-For manual diagnosis, keep package, install, launch, running-state verification, and Inspector as distinct steps. Close an old running instance before reinstalling when validating a changed package, and increment `appinfo.json` version so the TV cannot retain a same-version installation.
+For manual diagnosis, keep package, install, launch, running-state verification, and Inspector as distinct steps. Close an old running instance before reinstalling a changed package, and preserve the existing `appinfo.json` version during routine real-TV testing. See `real-device.md` for the clean-reinstall fallback and its data-loss guardrail.
 
 ```bash
 TASK_TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/webos-manual.XXXXXX")
@@ -136,6 +136,6 @@ Do not install, remove, or launch on a real TV unless the user requested that st
 - `ares-launch` requests `--simulator-path`: the requested Simulator version was not found in CLI defaults; provide the verified extracted directory.
 - A bundled script reports `$'\r'` or `set: -\r`: its line endings are CRLF; convert the repository-owned `.sh` file to LF and preserve it with `.gitattributes`.
 - `ares-package` reports a missing `node:*` module: the active Node.js runtime is too old; upgrade Node.js LTS and open a new Git Bash session.
-- Install reports success but the TV still shows old code: verify the generated IPK filename, increment `appinfo.json` version, close the old instance, install the explicit versioned IPK, relaunch, and confirm both installed version and running state.
+- Install reports success but the TV still shows old code: verify the generated IPK filename, close the old instance, reinstall the same-version IPK, relaunch, and confirm the running state. Do not change `appinfo.json` automatically; use the explicitly authorized clean-reinstall fallback from `real-device.md` if needed.
 - Key retrieval fails: verify Developer Mode status, Key Server, session expiry, port `9922`, user `prisoner`, network reachability, and passphrase case.
 - The playlist loads but video fails in Simulator: inspect `MediaError`, container, codec, and network state; do not infer a network failure solely from Simulator media limitations.

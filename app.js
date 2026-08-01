@@ -15,7 +15,7 @@
   var RETRY_DELAY_MS = getNumberOption(playbackConfig.retryDelayMs, 1200, 0, 10000);
   var CHANNEL_SWITCH_DELAY_MS = getNumberOption(
     playbackConfig.channelSwitchDelayMs,
-    220,
+    100,
     100,
     1000
   );
