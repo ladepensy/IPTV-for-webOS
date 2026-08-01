@@ -125,6 +125,12 @@
           effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 
+        case "POINTER_MOVE":
+          if (next.uiMode !== constants.UI_MODE_HIDDEN) {
+            effects.push(effect("SCHEDULE_UI_HIDE"));
+          }
+          break;
+
         case "KEY_LEFT":
           if (next.uiMode === constants.UI_MODE_CHANNELS) {
             var leftAction = updateChannelBrowser(next, { type: "LEFT" });

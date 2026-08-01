@@ -82,6 +82,11 @@ assert.strictEqual(outcome.effects[0].type, "CANCEL_UI_HIDE");
 assert.strictEqual(outcome.state.uiMode, constants.UI_MODE_HIDDEN);
 
 state = outcome.state;
+outcome = send(state, { type: "POINTER_MOVE" });
+assert.strictEqual(outcome.state.uiMode, constants.UI_MODE_HIDDEN);
+assert.deepStrictEqual(outcome.effects, []);
+
+state = outcome.state;
 outcome = send(state, { type: "KEY_BACK" });
 assert.strictEqual(outcome.effects[0].type, "EXIT_APP");
 assert.strictEqual(outcome.state.uiMode, constants.UI_MODE_HIDDEN);

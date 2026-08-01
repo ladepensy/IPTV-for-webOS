@@ -1087,7 +1087,7 @@
     var now = Date.now();
     if (now - lastPointerActivityAt < 250) return;
     lastPointerActivityAt = now;
-    dispatch({ type: "USER_ACTIVITY" });
+    dispatch({ type: "POINTER_MOVE" });
   });
 
   player.addEventListener("playing", function () {
