@@ -43,9 +43,6 @@
   var loadingIndicatorTimer = null;
   var loadingIndicatorAttemptId = -1;
   var uiHideTimer = null;
-  var channelItems = [];
-  var renderedFocusedIndex = -1;
-  var renderedPlayingIndex = -1;
   var activeMediaAttemptId = -1;
   var activeMediaIndex = -1;
   var hasPlayedMedia = false;
@@ -57,9 +54,6 @@
   var lastPointerActivityAt = 0;
 
   var uiLayer = document.getElementById("ui-layer");
-  var channelPanel = document.getElementById("channel-panel");
-  var channelList = document.getElementById("channel-list");
-  var channelCount = document.getElementById("channel-count");
   var currentTitle = document.getElementById("current-title");
   var connectionState = document.getElementById("connection-state");
   var player = document.getElementById("player");
@@ -69,6 +63,22 @@
   var nowPlayingTitle = document.getElementById("now-playing-title");
   var nowPlayingGroup = document.getElementById("now-playing-group");
   var clock = document.getElementById("clock");
+  var channelPanelView = window.IPTVChannelPanel.create({
+    panelElement: document.getElementById("channel-panel"),
+    listElement: document.getElementById("channel-list"),
+    countElement: document.getElementById("channel-count"),
+    onFocus: function (index) {
+      dispatch({ type: "CHANNEL_FOCUS", index: index });
+    },
+    onSelect: function (index, inputAt) {
+      dispatch({
+        type: "CHANNEL_CLICK",
+        index: index,
+        inputAt: inputAt
+      });
+    },
+    getInputTime: getMonotonicTime
+  });
 
   function getNumberOption(value, fallback, minimum, maximum) {
     var parsed = Number(value);
@@ -153,11 +163,16 @@
     var playingChannel = state.channels[state.playingIndex];
 
     uiLayer.classList.toggle("is-hidden", uiIsHidden);
-    channelPanel.classList.toggle("is-open", panelIsOpen);
-    channelPanel.setAttribute("aria-hidden", panelIsOpen ? "false" : "true");
-
-    if (previousState.channels !== state.channels) renderChannels();
-    updateFocus(previousState, interaction.shouldScrollForEvent(event));
+    channelPanelView.render({
+      open: panelIsOpen,
+      channels: state.channels,
+      focusedIndex: state.focusedIndex,
+      playingIndex: state.playingIndex,
+      shouldScroll: panelIsOpen &&
+        interaction.shouldScrollForEvent(event) &&
+        (previousState.uiMode !== UI_MODE_CHANNELS ||
+          previousState.focusedIndex !== state.focusedIndex)
+    });
 
     if (state.playlistStatus === "loading") {
       setConnectionState("连接中", "");
@@ -731,111 +746,6 @@
         if (attemptId !== state.playbackAttemptId || (error && error.name === "AbortError")) return;
         reportPlaybackFailure("play() 被拒绝", error, attemptId);
       });
-    }
-  }
-
-  function renderChannels() {
-    var fragment = document.createDocumentFragment();
-    channelList.innerHTML = "";
-    channelItems = [];
-    renderedFocusedIndex = -1;
-    renderedPlayingIndex = -1;
-
-    state.channels.forEach(function (channel, index) {
-      var item = document.createElement("button");
-      var art = document.createElement("span");
-      var number = document.createElement("span");
-      var copy = document.createElement("span");
-      var name = document.createElement("span");
-      var group = document.createElement("span");
-
-      item.type = "button";
-      item.className = "channel-item";
-      item.setAttribute("role", "option");
-      item.setAttribute("data-index", String(index));
-      item.setAttribute("aria-selected", "false");
-
-      art.className = "channel-art";
-      if (channel.logo) {
-        var logo = document.createElement("img");
-        logo.alt = "";
-        logo.loading = "lazy";
-        logo.src = channel.logo;
-        logo.addEventListener("error", function () {
-          logo.remove();
-          art.textContent = (channel.name || "?").slice(0, 1).toUpperCase();
-        });
-        art.appendChild(logo);
-      } else {
-        art.textContent = (channel.name || "?").slice(0, 1).toUpperCase();
-      }
-
-      number.className = "channel-number";
-      number.textContent = String(index + 1).padStart(3, "0");
-
-      copy.className = "channel-copy";
-      name.className = "channel-name";
-      name.textContent = channel.name;
-      group.className = "channel-group";
-      group.textContent = channel.group;
-
-      copy.appendChild(name);
-      copy.appendChild(group);
-      item.appendChild(art);
-      item.appendChild(number);
-      item.appendChild(copy);
-      item.addEventListener("mouseenter", function () {
-        dispatch({ type: "CHANNEL_FOCUS", index: index });
-      });
-      item.addEventListener("focus", function () {
-        dispatch({ type: "CHANNEL_FOCUS", index: index });
-      });
-      item.addEventListener("click", function () {
-        dispatch({
-          type: "CHANNEL_CLICK",
-          index: index,
-          inputAt: getMonotonicTime()
-        });
-      });
-      channelItems.push(item);
-      fragment.appendChild(item);
-    });
-
-    channelList.appendChild(fragment);
-    channelCount.textContent = String(state.channels.length);
-  }
-
-  function updateItemState(index, className, enabled) {
-    var item = channelItems[index];
-    if (!item) return;
-    item.classList.toggle(className, enabled);
-    if (className === "is-focused") {
-      item.setAttribute("aria-selected", enabled ? "true" : "false");
-    }
-  }
-
-  function updateFocus(previousState, shouldScroll) {
-    if (state.uiMode !== UI_MODE_CHANNELS) return;
-
-    if (renderedFocusedIndex !== state.focusedIndex) {
-      updateItemState(renderedFocusedIndex, "is-focused", false);
-      updateItemState(state.focusedIndex, "is-focused", true);
-      renderedFocusedIndex = state.focusedIndex;
-    }
-
-    if (renderedPlayingIndex !== state.playingIndex) {
-      updateItemState(renderedPlayingIndex, "is-playing", false);
-      updateItemState(state.playingIndex, "is-playing", true);
-      renderedPlayingIndex = state.playingIndex;
-    }
-
-    if (
-      shouldScroll &&
-      (previousState.uiMode !== UI_MODE_CHANNELS ||
-        previousState.focusedIndex !== state.focusedIndex) &&
-      channelItems[state.focusedIndex]
-    ) {
-      channelItems[state.focusedIndex].scrollIntoView({ block: "nearest" });
     }
   }
 

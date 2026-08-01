@@ -25,13 +25,20 @@
 .
 ├── appinfo.json   # webOS 应用清单
 ├── index.html     # 应用页面
-├── styles.css     # 电视端界面样式
+├── styles.css     # 电视端全局界面样式
+├── features/
+│   └── channels/
+│       ├── channel-panel.js  # 频道列表渲染、焦点与输入适配
+│       └── channel-panel.css # 频道列表独立样式
 ├── interaction.js # 操作状态机与事件转换
-├── app.js         # M3U、页面渲染和播放副作用
+├── app.js         # M3U、全局渲染和播放副作用
 ├── docs/interaction-design.md # 操作状态与事件转换规范
 ├── config.example.js # 脱敏的本地配置模板
 ├── icon.png
-└── largeIcon.png
+├── largeIcon.png
+└── tests/
+    ├── interaction.test.js
+    └── channel-panel.test.js
 ```
 
 ## 开发环境
@@ -90,6 +97,7 @@ ares-server . --open
 
 ```bash
 node tests/interaction.test.js
+node tests/channel-panel.test.js
 ```
 
 ## Simulator 调试

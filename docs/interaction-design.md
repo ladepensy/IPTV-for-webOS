@@ -63,7 +63,13 @@ Back 的层级固定为：`channels/info → hidden → 系统退出确认`。�
    新的 state              effects
        ↓                     ↓
  renderState()        播放、计时、存储、退出
+       ↓
+ channelPanel.render()
 ```
+
+频道列表的 DOM 创建、开关状态、焦点样式、播放标记和滚动由
+`features/channels/channel-panel.js` 独立负责。组件只接收状态快照，并把焦点和选择
+转换成回调；它不直接修改应用状态，也不控制播放器。
 
 换台副作用分为即时播放和延迟提交两条路径。`START_PLAYBACK` 用于启动、重试和频道列表确认；`SCHEDULE_PLAYBACK_SWITCH` 用于信息/隐藏状态下的连续上、下换台。等待提交期间旧视频保持播放，播放器旧事件不会覆盖目标频道的状态。
 
