@@ -88,6 +88,11 @@
   var connectionState = document.getElementById("connection-state");
   var connectionStateLabel = document.getElementById("connection-state-label");
   var player = document.getElementById("player");
+  var channelSwitchCover = document.getElementById("channel-switch-cover");
+  var channelSwitchLogoImage = document.getElementById("channel-switch-logo-image");
+  var channelSwitchLogoFallback = document.getElementById("channel-switch-logo-fallback");
+  var channelSwitchTitle = document.getElementById("channel-switch-title");
+  var channelSwitchGroup = document.getElementById("channel-switch-group");
   var playerPlaceholder = document.getElementById("player-placeholder");
   var playerMessage = document.getElementById("player-message");
   var playerDiagnostics = document.getElementById("player-diagnostics");
@@ -277,6 +282,7 @@
   function stopCurrentSourcePlayback() {
     clearPlaybackTimers();
     cancelPendingPlaybackSwitch();
+    hideChannelSwitchCover();
     player.pause();
     player.removeAttribute("src");
     player.load();
@@ -630,6 +636,45 @@
     return group;
   }
 
+  function showChannelSwitchCover(channel) {
+    if (!channel || !channelSwitchCover) return;
+    var name = String(channel.name || t("channel.unnamed")).trim();
+    var logoUrl = channel.logo ? String(channel.logo).trim() : "";
+    var initial = name.slice(0, 1).toUpperCase() || "?";
+
+    channelSwitchTitle.textContent = name;
+    channelSwitchGroup.textContent = displayGroup(channel.group);
+    channelSwitchLogoFallback.textContent = initial;
+
+    if (!logoUrl) {
+      channelSwitchLogoImage.dataset.logoUrl = "";
+      channelSwitchLogoImage.removeAttribute("src");
+      channelSwitchLogoImage.hidden = true;
+      channelSwitchLogoFallback.hidden = false;
+    } else if (channelSwitchLogoImage.dataset.logoUrl !== logoUrl) {
+      channelSwitchLogoImage.dataset.logoUrl = logoUrl;
+      channelSwitchLogoImage.hidden = true;
+      channelSwitchLogoFallback.hidden = false;
+      channelSwitchLogoImage.src = logoUrl;
+    }
+
+    channelSwitchCover.classList.add("is-visible");
+  }
+
+  function hideChannelSwitchCover() {
+    if (channelSwitchCover) channelSwitchCover.classList.remove("is-visible");
+  }
+
+  channelSwitchLogoImage.addEventListener("load", function () {
+    channelSwitchLogoImage.hidden = false;
+    channelSwitchLogoFallback.hidden = true;
+  });
+
+  channelSwitchLogoImage.addEventListener("error", function () {
+    channelSwitchLogoImage.hidden = true;
+    channelSwitchLogoFallback.hidden = false;
+  });
+
   function renderNowPlayingLogo(channel) {
     var logoUrl = channel && channel.logo ? String(channel.logo).trim() : "";
     var initial = channel && channel.name
@@ -861,6 +906,7 @@
   function schedulePlaybackSwitch(currentEffect) {
     cancelPendingPlaybackSwitch();
     clearPlaybackTimers();
+    showChannelSwitchCover(state.channels[currentEffect.playingIndex]);
     if (hasPlayedMedia) hidePlaybackOverlay();
     beginPlaybackMetric("remote-navigation", currentEffect.inputAt);
 
@@ -939,12 +985,14 @@
   function updatePlaybackOverlay(event) {
     if (state.playbackStatus === PLAYBACK_PLAYING) {
       hasPlayedMedia = true;
+      hideChannelSwitchCover();
       hidePlaybackOverlay();
       return;
     }
 
     if (state.playbackStatus === interaction.constants.PLAYBACK_FAILED ||
         state.playbackStatus === interaction.constants.PLAYBACK_ENDED) {
+      hideChannelSwitchCover();
       showFullPlaybackOverlay();
       return;
     }
@@ -1120,6 +1168,7 @@
     resetMediaInfo();
     attachPlaybackMetric(attemptId);
     if (hasPlayedMedia) {
+      showChannelSwitchCover(channel);
       scheduleCompactPlaybackOverlay(attemptId);
     } else {
       showFullPlaybackOverlay();

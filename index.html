@@ -10,6 +10,20 @@
     <main id="root" class="app-shell">
       <section class="player-stage" aria-label="Fullscreen player" data-i18n-aria-label="player.fullscreen">
         <video id="player" autoplay playsinline></video>
+        <div id="channel-switch-cover" class="channel-switch-cover" aria-hidden="true">
+          <div class="channel-switch-content">
+            <div class="channel-switch-logo" aria-hidden="true">
+              <img id="channel-switch-logo-image" alt="" hidden />
+              <span id="channel-switch-logo-fallback">?</span>
+            </div>
+            <p class="eyebrow" data-i18n="playback.switchingChannel">Switching channel</p>
+            <h2 id="channel-switch-title" class="channel-switch-title"></h2>
+            <p id="channel-switch-group" class="channel-switch-group"></p>
+            <div class="signal-mark channel-switch-signal" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
         <div id="player-placeholder" class="player-placeholder">
           <div class="signal-mark" aria-hidden="true">
             <span></span><span></span><span></span>

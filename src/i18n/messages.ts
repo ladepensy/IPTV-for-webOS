@@ -67,6 +67,7 @@ export const en = {
   "playlist.noChannels": "The playlist contains no channels",
   "playlist.checkAccess": "Check that the M3U source is accessible",
   "playback.connecting": "Connecting to {{name}}",
+  "playback.switchingChannel": "Switching channel",
   "playback.streamType": "Stream type: {{value}}",
   "playback.attempt": "Attempt: {{current}}/{{total}}",
   "playback.mediaDetected": "Media detected. Starting playback…",
