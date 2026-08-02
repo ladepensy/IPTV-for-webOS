@@ -352,7 +352,7 @@ Official LG documentation:
 | Input | Behavior |
 | --- | --- |
 | Right | Open the channel browser; move through the source, group, and channel columns |
-| Left | Return to the previous browser column; return from the source column to playback information |
+| Left | Open the channel browser when closed; return to the previous column when open; stay in the source column at the left boundary |
 | Up / Down | Change channels from the info or hidden state; move focus within the active browser column |
 | OK | Reveal hidden UI; advance through source/group columns; play the selected channel |
 | Back | Hide visible info or the channel browser; show the system exit confirmation when already hidden |
@@ -360,7 +360,7 @@ Official LG documentation:
 | Magic Remote pointer | Synchronize focus on hover and play on click |
 | Magic Remote wheel | Move one channel up or down |
 
-When the UI is hidden, Up and Down change channels and show playback information, while Right opens the channel browser. Other ordinary keys and pointer activity only reveal the info view. Back invokes the system exit confirmation. After five seconds without input, the top status, browser, now-playing information, and hints are hidden without pausing or stopping video. If playback fails or ends, OK retries the current channel when the browser is closed; browser navigation remains unchanged while it is open.
+When the UI is hidden, Up and Down change channels and show playback information, while Left or Right opens the channel browser. Other ordinary keys and pointer activity only reveal the info view. Back invokes the system exit confirmation. After five seconds without input, the top status, browser, now-playing information, and hints are hidden without pausing or stopping video. If playback fails or ends, OK retries the current channel when the browser is closed; browser navigation remains unchanged while it is open.
 
 ## M3U source configuration
 

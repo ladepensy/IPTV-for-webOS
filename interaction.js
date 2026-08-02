@@ -198,12 +198,9 @@
         case "KEY_LEFT":
           if (next.uiMode === constants.UI_MODE_SOURCE_FORM) break;
           if (next.uiMode === constants.UI_MODE_CHANNELS) {
-            var leftAction = updateChannelBrowser(next, { type: "LEFT" });
-            if (leftAction && leftAction.type === "CLOSE") {
-              next.uiMode = constants.UI_MODE_INFO;
-            }
+            updateChannelBrowser(next, { type: "LEFT" });
           } else {
-            next.uiMode = constants.UI_MODE_INFO;
+            openChannels(next);
           }
           effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
@@ -293,12 +290,16 @@
             var confirmAction = updateChannelBrowser(next, { type: "CONFIRM" });
             handleBrowserAction(next, confirmAction, effects);
             if (confirmAction && confirmAction.type === "CHANNEL_SELECTED") {
-              selectChannel(next, confirmAction.index);
-              effects.push(effect("REMEMBER_CHANNEL"));
-              effects.push(effect("START_PLAYBACK", {
-                source: "remote-ok",
-                inputAt: event.inputAt
-              }));
+              if (confirmAction.index === next.playingIndex) {
+                next.uiMode = constants.UI_MODE_INFO;
+              } else {
+                selectChannel(next, confirmAction.index);
+                effects.push(effect("REMEMBER_CHANNEL"));
+                effects.push(effect("START_PLAYBACK", {
+                  source: "remote-ok",
+                  inputAt: event.inputAt
+                }));
+              }
             }
             effects.push(effect("SCHEDULE_UI_HIDE"));
           } else if (next.channels.length) {
@@ -386,12 +387,16 @@
 
         case "CHANNEL_CLICK":
           if (!next.channels[event.index]) break;
-          selectChannel(next, event.index);
-          effects.push(effect("REMEMBER_CHANNEL"));
-          effects.push(effect("START_PLAYBACK", {
-            source: "pointer",
-            inputAt: event.inputAt
-          }));
+          if (Number(event.index) === next.playingIndex) {
+            next.uiMode = constants.UI_MODE_INFO;
+          } else {
+            selectChannel(next, event.index);
+            effects.push(effect("REMEMBER_CHANNEL"));
+            effects.push(effect("START_PLAYBACK", {
+              source: "pointer",
+              inputAt: event.inputAt
+            }));
+          }
           effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 

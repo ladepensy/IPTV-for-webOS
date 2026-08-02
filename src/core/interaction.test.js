@@ -60,12 +60,50 @@ assert.ok(!outcome.effects.some(function (item) { return item.type === "REMEMBER
 assert.strictEqual(outcome.effects[0].playingIndex, 1);
 assert.strictEqual(outcome.effects[0].inputAt, 123);
 
+var infoLeftState = send(state, { type: "KEY_LEFT" }).state;
+assert.strictEqual(infoLeftState.uiMode, constants.UI_MODE_CHANNELS);
+assert.strictEqual(infoLeftState.channelBrowser.column, 2);
+var sameChannelOutcome = send(infoLeftState, { type: "KEY_OK", inputAt: 234 });
+assert.strictEqual(sameChannelOutcome.state.uiMode, constants.UI_MODE_INFO);
+assert.strictEqual(sameChannelOutcome.state.playingIndex, state.playingIndex);
+assert.strictEqual(sameChannelOutcome.state.playbackStatus, state.playbackStatus);
+assert.ok(!sameChannelOutcome.effects.some(function (item) { return item.type === "REMEMBER_CHANNEL"; }));
+assert.ok(!sameChannelOutcome.effects.some(function (item) { return item.type === "START_PLAYBACK"; }));
+
+var sameChannelClickState = JSON.parse(JSON.stringify(infoLeftState));
+var sameChannelClickOutcome = send(sameChannelClickState, {
+  type: "CHANNEL_CLICK",
+  index: state.playingIndex,
+  inputAt: 235
+});
+assert.strictEqual(sameChannelClickOutcome.state.uiMode, constants.UI_MODE_INFO);
+assert.strictEqual(sameChannelClickOutcome.state.playingIndex, state.playingIndex);
+assert.strictEqual(sameChannelClickOutcome.state.playbackStatus, state.playbackStatus);
+assert.ok(!sameChannelClickOutcome.effects.some(function (item) { return item.type === "REMEMBER_CHANNEL"; }));
+assert.ok(!sameChannelClickOutcome.effects.some(function (item) { return item.type === "START_PLAYBACK"; }));
+
+var hiddenNavigationState = JSON.parse(JSON.stringify(state));
+hiddenNavigationState.uiMode = constants.UI_MODE_HIDDEN;
+var hiddenLeftState = send(hiddenNavigationState, { type: "KEY_LEFT" }).state;
+assert.strictEqual(hiddenLeftState.uiMode, constants.UI_MODE_CHANNELS);
+assert.strictEqual(hiddenLeftState.channelBrowser.column, 2);
+var hiddenRightState = send(hiddenNavigationState, { type: "KEY_RIGHT" }).state;
+assert.strictEqual(hiddenRightState.uiMode, constants.UI_MODE_CHANNELS);
+assert.strictEqual(hiddenRightState.channelBrowser.column, 2);
+
 state = send(state, { type: "KEY_RIGHT" }).state;
 assert.strictEqual(state.uiMode, constants.UI_MODE_CHANNELS);
 assert.strictEqual(state.channelBrowser.column, 2);
 assert.strictEqual(state.channelBrowser.focusedChannelIndex, state.playingIndex);
 assert.strictEqual(state.playlistSources.length, 1);
 state = send(state, { type: "KEY_LEFT" }).state;
+assert.strictEqual(state.channelBrowser.column, 1);
+state = send(state, { type: "KEY_LEFT" }).state;
+assert.strictEqual(state.channelBrowser.column, 0);
+state = send(state, { type: "KEY_LEFT" }).state;
+assert.strictEqual(state.uiMode, constants.UI_MODE_CHANNELS);
+assert.strictEqual(state.channelBrowser.column, 0);
+state = send(state, { type: "KEY_RIGHT" }).state;
 assert.strictEqual(state.channelBrowser.column, 1);
 state = send(state, { type: "KEY_DOWN", delta: 1 }).state;
 assert.strictEqual(state.channelBrowser.focusedGroupIndex, 2);

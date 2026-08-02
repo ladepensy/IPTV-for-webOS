@@ -34,7 +34,7 @@
 | --- | --- | --- |
 | `SOURCE_SELECTED` | 确认当前 M3U，进入分组列 | 否 |
 | `GROUP_SELECTED` | 确认当前分组，筛选并进入频道列 | 否 |
-| `CHANNEL_SELECTED` | 确认当前频道，把频道索引交给主状态机 | 是 |
+| `CHANNEL_SELECTED` | 确认当前频道，把频道索引交给主状态机 | 仅与当前播放频道不同时 |
 
 在 `info` / `hidden` 中连续按上、下换台时，`playingIndex` 和屏幕频道信息会立即更新，但媒体副作用会合并：默认等待最后一次输入 220ms 后，只对最终频道执行一次 `pause → src → load → play`。频道列表中按 OK 或点击频道仍立即播放，不经过合并等待。
 
@@ -44,7 +44,7 @@
 
 | 输入 | `hidden` | `info` | `channels` |
 | --- | --- | --- | --- |
-| `←` | 显示信息 | 保持信息 | 返回上一列；M3U 列关闭频道库 |
+| `←` | 打开频道库 | 打开频道库 | 返回上一列；M3U 列保持不动 |
 | `→` | 打开频道库 | 打开频道库 | 进入下一列；分组进入频道列时应用筛选 |
 | `↑ / ↓` | 直接换台并显示信息 | 直接换台 | 在当前列移动焦点，不立即换台 |
 | `OK` | 显示信息 | 打开频道库 | M3U/分组列进入下一列；频道列播放并关闭频道库 |
@@ -55,7 +55,7 @@
 
 例外规则：当频道库未打开、界面已经可见，且播放状态是 `failed` 或 `ended` 时，`OK` 优先直接重播当前频道；频道库打开时 `OK` 仍按当前列执行进入或选台。`hidden` 状态下第一次按 OK 只显示信息界面。
 
-Back 的层级固定为：`channels/info → hidden → 系统退出确认`。右键在任意状态下都可以进入 `channels`；`hidden` 下导航上/下会直接换台并显示 `info`，Back 直接进入系统退出流程，其他普通输入只负责唤醒 `info`。
+Back 的层级固定为：`channels/info → hidden → 系统退出确认`。频道库关闭时，左、右键都可以进入 `channels`；频道库打开后，左键只负责在列之间返回，到达 M3U 列后保持不动，右键负责进入下一列，关闭频道库统一使用 Back。`hidden` 下导航上/下会直接换台并显示 `info`，Back 直接进入系统退出流程，其他普通输入只负责唤醒 `info`。
 
 退出副作用优先调用 `webOS.platformBack()`；如果项目未加载 `webOSTV.js`，则直接调用电视运行环境注入的 `PalmSystem.platformBack()`。只有普通浏览器不存在这两个 API 时才使用 `window.close()`。
 
@@ -77,7 +77,9 @@ Back 的层级固定为：`channels/info → hidden → 系统退出确认`。�
  channelPanel.render()
 ```
 
-M3U、分组和频道列的业务焦点、切列与确认由 `src/core/channel-browser-state.ts` 管理。主状态机只在收到 `CHANNEL_SELECTED` 时执行选台和播放副作用；`SOURCE_SELECTED` 与 `GROUP_SELECTED` 不会进入播放路径。
+M3U、分组和频道列的业务焦点、切列与确认由 `src/core/channel-browser-state.ts` 管理。主状态机收到 `CHANNEL_SELECTED` 后会先比较频道索引；如果仍是当前播放频道，只关闭频道库并回到播放信息，不重建媒体连接。只有选择不同频道时才执行选台和播放副作用；`SOURCE_SELECTED` 与 `GROUP_SELECTED` 不会进入播放路径。
+
+Enact Spotlight 会把聚焦按钮上的遥控器 OK 模拟为点击事件，因此 `CHANNEL_CLICK` 与 `KEY_OK → CHANNEL_SELECTED` 使用相同的同频道短路规则。鼠标直接点击当前播放频道也只关闭频道库，不会重新加载媒体。
 
 三级频道库的 DOM 创建、列位移、焦点样式、播放标记、节目单浮窗和滚动由
 `src/ui/channel-panel.tsx` 独立负责。组件只接收状态快照，并把焦点和选择转换成回调；
@@ -91,7 +93,7 @@ Enact Spotlight 管理实际 DOM 焦点、当前列内的上/下 5-way 移动、
 
 节目单默认从 M3U 首行 `x-tvg-url` 自动发现，也可由 `epg.url` 覆盖。XMLTV 加载后会把 `<channel>` 的 `id` 与 `display-name` 建立别名，再与 M3U 的 `tvg-id`、`tvg-name` 或频道名匹配。频道列获得焦点时浮窗自动显示当前及后续节目；没有匹配数据时显示空态，不阻断频道选择和播放。
 
-换台副作用分为即时播放和延迟提交两条路径。`START_PLAYBACK` 用于启动、重试和频道列表确认；`SCHEDULE_PLAYBACK_SWITCH` 用于信息/隐藏状态下的连续上、下换台。等待提交期间旧视频保持播放，播放器旧事件不会覆盖目标频道的状态。
+换台副作用分为即时播放和延迟提交两条路径。`START_PLAYBACK` 用于启动、重试和频道列表确认的新频道；再次确认当前播放频道不会触发该副作用。`SCHEDULE_PLAYBACK_SWITCH` 用于信息/隐藏状态下的连续上、下换台。等待提交期间旧视频保持播放，播放器旧事件不会覆盖目标频道的状态。
 
 ## 换台性能策略
 

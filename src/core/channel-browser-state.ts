@@ -143,7 +143,7 @@ export function transition(current: ChannelBrowserState, event: BrowserEvent, co
       move(next, Number(event.delta) || 0, context);
       return result(next);
     case "LEFT":
-      if (next.column === COLUMN_SOURCES) return result(next, {type: "CLOSE"});
+      if (next.column === COLUMN_SOURCES) return result(next);
       next.column -= 1;
       return result(next);
     case "RIGHT":
