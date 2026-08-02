@@ -63,6 +63,7 @@
   var loadingIndicatorTimer = null;
   var loadingIndicatorAttemptId = -1;
   var uiHideTimer = null;
+  var currentMediaInfo = { width: 0, height: 0 };
   var activeMediaAttemptId = -1;
   var activeMediaIndex = -1;
   var hasPlayedMedia = false;
@@ -85,6 +86,7 @@
   var playerDiagnostics = document.getElementById("player-diagnostics");
   var nowPlayingTitle = document.getElementById("now-playing-title");
   var nowPlayingGroup = document.getElementById("now-playing-group");
+  var nowPlayingMedia = document.getElementById("now-playing-media");
   var nowPlayingProgramTitle = document.getElementById("now-playing-program-title");
   var nowPlayingProgramTime = document.getElementById("now-playing-program-time");
   var nowPlayingProgress = document.getElementById("now-playing-progress");
@@ -882,6 +884,27 @@
     return { label: "由电视自动探测", mime: "" };
   }
 
+  function renderMediaInfo() {
+    nowPlayingMedia.textContent = window.IPTVMediaInfo.formatMediaInfo(currentMediaInfo);
+  }
+
+  function updateMediaResolution() {
+    var width = Number(player.videoWidth) || 0;
+    var height = Number(player.videoHeight) || 0;
+    if (width === currentMediaInfo.width && height === currentMediaInfo.height) return;
+    currentMediaInfo.width = width;
+    currentMediaInfo.height = height;
+    renderMediaInfo();
+  }
+
+  function resetMediaInfo() {
+    currentMediaInfo = {
+      width: 0,
+      height: 0
+    };
+    renderMediaInfo();
+  }
+
   function getMediaErrorName(error) {
     var names = {
       1: "MEDIA_ERR_ABORTED",
@@ -1003,6 +1026,7 @@
     clearPlaybackTimers();
     activeMediaAttemptId = attemptId;
     activeMediaIndex = playingIndex;
+    resetMediaInfo();
     attachPlaybackMetric(attemptId);
     if (hasPlayedMedia) {
       scheduleCompactPlaybackOverlay(attemptId);
@@ -1217,6 +1241,7 @@
 
   player.addEventListener("loadedmetadata", function () {
     if (channelSwitchTimer) return;
+    updateMediaResolution();
     recordPlaybackMetric("metadata", activeMediaAttemptId);
     dispatch({
       type: "PLAYBACK_METADATA",
@@ -1224,6 +1249,8 @@
       details: buildPlaybackDiagnostics("已读取媒体信息", null, state.playbackRetryCount)
     });
   });
+
+  player.addEventListener("resize", updateMediaResolution);
 
   player.addEventListener("canplay", function () {
     if (channelSwitchTimer) return;

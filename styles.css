@@ -362,6 +362,17 @@ h1 {
   font-size: 14px;
 }
 
+.now-playing-media {
+  overflow: hidden;
+  margin-top: 7px;
+  color: rgba(247, 248, 252, 0.7);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .now-playing-program {
   max-width: 620px;
   margin-top: 12px;

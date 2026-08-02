@@ -4,6 +4,7 @@ import type {channelPanelApi} from "./ui/channel-panel";
 import type {sourceFormApi} from "./ui/source-form";
 import type {spotlightApi} from "./ui/spotlight";
 import type {parseM3U} from "./core/m3u";
+import type {mediaInfoApi} from "./core/media-info";
 import type {parseXmltv} from "./core/xmltv";
 
 declare global {
@@ -15,6 +16,7 @@ declare global {
     IPTVSourceForm: typeof sourceFormApi;
     IPTVSpotlight: typeof spotlightApi;
     IPTVCore: {parseM3U: typeof parseM3U; parseXmltv: typeof parseXmltv};
+    IPTVMediaInfo: typeof mediaInfoApi;
     IPTVInteraction: any;
     webOS?: {platformBack?: () => void};
   }
