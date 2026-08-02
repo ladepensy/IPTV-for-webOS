@@ -1,4 +1,6 @@
 import type {Channel} from "./types";
+import {t} from "../i18n";
+import {OTHER_GROUP_ID} from "./channel-browser-state";
 
 export interface M3uResult {
   channels: Channel[];
@@ -44,9 +46,9 @@ export function parseM3U(text: string, baseUrl: string): M3uResult {
       pending = {
         id: attributes["tvg-id"] || "",
         name: (commaIndex >= 0 ? line.slice(commaIndex + 1).trim() : "") ||
-          attributes["tvg-name"] || "未命名频道",
+          attributes["tvg-name"] || t("channel.unnamed"),
         logo: attributes["tvg-logo"] || "",
-        group: attributes["group-title"] || "其他",
+        group: attributes["group-title"] || OTHER_GROUP_ID,
         url: ""
       };
       return;
@@ -55,9 +57,9 @@ export function parseM3U(text: string, baseUrl: string): M3uResult {
     if (line.charAt(0) !== "#") {
       const channel = pending || {
         id: "",
-        name: `频道 ${String(channels.length + 1).padStart(3, "0")}`,
+        name: t("channel.generated", {number: String(channels.length + 1).padStart(3, "0")}),
         logo: "",
-        group: "其他",
+        group: OTHER_GROUP_ID,
         url: ""
       };
       channel.url = resolveUrl(line, baseUrl);

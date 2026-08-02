@@ -10,6 +10,8 @@
   var COLUMN_SOURCES = 0;
   var COLUMN_GROUPS = 1;
   var COLUMN_CHANNELS = 2;
+  var ALL_GROUP_ID = "__all__";
+  var OTHER_GROUP_ID = "__other__";
 
   function createInitialState(initialChannelIndex, initialSourceIndex) {
     return {
@@ -17,7 +19,7 @@
       focusedSourceIndex: Math.max(0, Number(initialSourceIndex) || 0),
       focusedGroupIndex: 1,
       focusedChannelIndex: Math.max(0, Number(initialChannelIndex) || 0),
-      selectedGroup: "全部"
+      selectedGroup: ALL_GROUP_ID
     };
   }
 
@@ -42,9 +44,9 @@
   }
 
   function getGroups(channels) {
-    var groups = ["全部"];
+    var groups = [ALL_GROUP_ID];
     channels.forEach(function (channel) {
-      var group = channel.group || "其他";
+      var group = channel.group || OTHER_GROUP_ID;
       if (groups.indexOf(group) < 0) groups.push(group);
     });
     return groups;
@@ -53,7 +55,7 @@
   function getVisibleChannelIndices(state, channels) {
     var indices = [];
     channels.forEach(function (channel, index) {
-      if (state.selectedGroup === "全部" || channel.group === state.selectedGroup) {
+      if (state.selectedGroup === ALL_GROUP_ID || (channel.group || OTHER_GROUP_ID) === state.selectedGroup) {
         indices.push(index);
       }
     });
@@ -63,7 +65,7 @@
   function enterFocusedGroup(next, channels) {
     var groups = getGroups(channels);
     next.focusedGroupIndex = Math.max(1, clamp(next.focusedGroupIndex, groups.length + 1));
-    next.selectedGroup = groups[next.focusedGroupIndex - 1] || "全部";
+    next.selectedGroup = groups[next.focusedGroupIndex - 1] || ALL_GROUP_ID;
     var visibleIndices = getVisibleChannelIndices(next, channels);
     if (visibleIndices.indexOf(next.focusedChannelIndex) < 0 && visibleIndices.length) {
       next.focusedChannelIndex = visibleIndices[0];
@@ -73,11 +75,11 @@
 
   function restoreGroup(next, group, channels) {
     var groups = getGroups(channels);
-    var selectedGroup = String(group || "全部");
+    var selectedGroup = String(group || ALL_GROUP_ID);
     var groupIndex = groups.indexOf(selectedGroup);
     var channel = channels[next.focusedChannelIndex];
-    if (groupIndex < 0 || (selectedGroup !== "全部" && (!channel || (channel.group || "其他") !== selectedGroup))) {
-      next.selectedGroup = "全部";
+    if (groupIndex < 0 || (selectedGroup !== ALL_GROUP_ID && (!channel || (channel.group || OTHER_GROUP_ID) !== selectedGroup))) {
+      next.selectedGroup = ALL_GROUP_ID;
       next.focusedGroupIndex = 1;
       return;
     }
@@ -235,7 +237,9 @@
     constants: {
       COLUMN_SOURCES: COLUMN_SOURCES,
       COLUMN_GROUPS: COLUMN_GROUPS,
-      COLUMN_CHANNELS: COLUMN_CHANNELS
+      COLUMN_CHANNELS: COLUMN_CHANNELS,
+      ALL_GROUP_ID: ALL_GROUP_ID,
+      OTHER_GROUP_ID: OTHER_GROUP_ID
     },
     createInitialState: createInitialState,
     copyState: copyState,

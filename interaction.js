@@ -29,6 +29,9 @@
   function create(options) {
     var maxPlaybackRetries = options.maxPlaybackRetries;
     var getStreamInfo = options.getStreamInfo;
+    var t = options.t || function (key) { return key; };
+    var ALL_GROUP_ID = channelBrowserApi.constants.ALL_GROUP_ID || "__all__";
+    var OTHER_GROUP_ID = channelBrowserApi.constants.OTHER_GROUP_ID || "__other__";
 
     function createInitialState() {
       return {
@@ -45,8 +48,8 @@
         playbackRetryCount: 0,
         playbackHasStarted: false,
         failedAttemptId: -1,
-        titleMessage: "正在载入频道…",
-        playerMessage: "正在获取播放列表",
+        titleMessage: t("channel.loading"),
+        playerMessage: t("playlist.fetching"),
         playerDetails: []
       };
     }
@@ -81,19 +84,19 @@
     function getWrappedChannelIndex(index, delta, channels, selectedGroup) {
       if (!channels.length) return 0;
       var currentIndex = clampChannelIndex(index, channels);
-      var currentGroup = selectedGroup || "全部";
+      var currentGroup = selectedGroup || ALL_GROUP_ID;
       var groupIndices = [];
       channels.forEach(function (channel, channelIndex) {
-        if (currentGroup === "全部" || (channel.group || "其他") === currentGroup) {
+        if (currentGroup === ALL_GROUP_ID || (channel.group || OTHER_GROUP_ID) === currentGroup) {
           groupIndices.push(channelIndex);
         }
       });
       var position = groupIndices.indexOf(currentIndex);
       if (position < 0) {
-        currentGroup = channels[currentIndex].group || "其他";
+        currentGroup = channels[currentIndex].group || OTHER_GROUP_ID;
         groupIndices = [];
         channels.forEach(function (channel, channelIndex) {
-          if ((channel.group || "其他") === currentGroup) groupIndices.push(channelIndex);
+          if ((channel.group || OTHER_GROUP_ID) === currentGroup) groupIndices.push(channelIndex);
         });
         position = groupIndices.indexOf(currentIndex);
       }
@@ -427,8 +430,8 @@
         case "PLAYLIST_LOADING":
           next.playlistStatus = "loading";
           if (!next.channels.length) {
-            next.titleMessage = "正在载入播放源…";
-            next.playerMessage = "正在获取播放列表";
+            next.titleMessage = t("playlist.loadingSource");
+            next.playerMessage = t("playlist.fetching");
             next.playerDetails = [];
           }
           break;
@@ -439,8 +442,8 @@
           next.playbackStatus = constants.PLAYBACK_IDLE;
           next.playbackRetryCount = 0;
           next.playbackHasStarted = false;
-          next.titleMessage = "正在切换播放源…";
-          next.playerMessage = "正在获取播放列表";
+          next.titleMessage = t("playlist.switchingSource");
+          next.playerMessage = t("playlist.fetching");
           next.playerDetails = [];
           break;
 
@@ -452,8 +455,8 @@
           next.playingIndex = -1;
           next.playbackStatus = constants.PLAYBACK_IDLE;
           next.uiMode = constants.UI_MODE_INFO;
-          next.titleMessage = "尚未配置播放列表";
-          next.playerMessage = "请添加一个 M3U 播放源";
+          next.titleMessage = t("playlist.unconfigured");
+          next.playerMessage = t("playlist.addPrompt");
           next.playerDetails = [];
           break;
 
@@ -482,7 +485,7 @@
         case "PLAYLIST_FAILED":
           next.playlistStatus = "failed";
           next.uiMode = constants.UI_MODE_INFO;
-          next.titleMessage = "播放列表加载失败";
+          next.titleMessage = t("playlist.loadFailed");
           next.playerMessage = event.message;
           next.playerDetails = [];
           break;
@@ -500,10 +503,10 @@
           next.playbackHasStarted = false;
           next.playbackStatus = constants.PLAYBACK_LOADING;
           channel = next.channels[next.playingIndex];
-          next.playerMessage = "正在连接 " + channel.name;
+          next.playerMessage = t("playback.connecting", { name: channel.name });
           next.playerDetails = [
-            "流类型：" + getStreamInfo(channel.url).label,
-            "尝试：" + (next.playbackRetryCount + 1) + "/" + (maxPlaybackRetries + 1)
+            t("playback.streamType", { value: getStreamInfo(channel.url).label }),
+            t("playback.attempt", { current: next.playbackRetryCount + 1, total: maxPlaybackRetries + 1 })
           ];
           effects.push(effect("EXECUTE_PLAYBACK_ATTEMPT", {
             attemptId: next.playbackAttemptId,
@@ -544,7 +547,7 @@
           ) {
             break;
           }
-          next.playerMessage = "媒体已识别，正在起播…";
+          next.playerMessage = t("playback.mediaDetected");
           next.playerDetails = event.details;
           break;
 
@@ -562,8 +565,8 @@
             ? constants.PLAYBACK_RETRYING
             : constants.PLAYBACK_FAILED;
           next.playerMessage = event.willRetry
-            ? "播放异常，正在重试…"
-            : "频道播放失败，请按 OK 重试或切换频道";
+            ? t("playback.retrying")
+            : t("playback.failed");
           next.playerDetails = event.details;
           effects.push(effect("CLEAR_PLAYBACK_TIMERS"));
           if (event.willRetry) {
@@ -578,7 +581,7 @@
           if (event.attemptId !== next.playbackAttemptId) break;
           next.playbackStatus = constants.PLAYBACK_ENDED;
           next.playbackHasStarted = false;
-          next.playerMessage = "频道播放已结束，按 OK 重新播放";
+          next.playerMessage = t("playback.ended");
           next.playerDetails = event.details;
           effects.push(effect("CLEAR_PLAYBACK_TIMERS"));
           break;

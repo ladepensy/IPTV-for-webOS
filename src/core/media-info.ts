@@ -15,10 +15,11 @@ export function getResolutionLabel(width: number, height: number): string {
 }
 
 export function formatMediaInfo(info: MediaInfo): string {
-  return getResolutionLabel(info.width, info.height) || "清晰度未知";
+  return getResolutionLabel(info.width, info.height) || t("media.unknownResolution");
 }
 
 export const mediaInfoApi = {
   getResolutionLabel,
   formatMediaInfo
 };
+import {t} from "../i18n";

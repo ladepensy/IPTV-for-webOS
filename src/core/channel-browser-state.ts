@@ -3,6 +3,8 @@ import type {Channel, SourceView} from "./types";
 export const COLUMN_SOURCES = 0;
 export const COLUMN_GROUPS = 1;
 export const COLUMN_CHANNELS = 2;
+export const ALL_GROUP_ID = "__all__";
+export const OTHER_GROUP_ID = "__other__";
 
 export interface ChannelBrowserState {
   column: number;
@@ -42,7 +44,7 @@ export function createInitialState(initialChannelIndex = 0, initialSourceIndex =
     focusedSourceIndex: Math.max(0, Number(initialSourceIndex) || 0),
     focusedGroupIndex: 1,
     focusedChannelIndex: Math.max(0, Number(initialChannelIndex) || 0),
-    selectedGroup: "全部"
+    selectedGroup: ALL_GROUP_ID
   };
 }
 
@@ -59,9 +61,9 @@ function wrap(index: number, length: number): number {
 }
 
 export function getGroups(channels: Channel[]): string[] {
-  const groups = ["全部"];
+  const groups = [ALL_GROUP_ID];
   channels.forEach((channel) => {
-    const group = channel.group || "其他";
+    const group = channel.group || OTHER_GROUP_ID;
     if (groups.indexOf(group) < 0) groups.push(group);
   });
   return groups;
@@ -70,7 +72,7 @@ export function getGroups(channels: Channel[]): string[] {
 export function getVisibleChannelIndices(state: ChannelBrowserState, channels: Channel[]): number[] {
   const indices: number[] = [];
   channels.forEach((channel, index) => {
-    if (state.selectedGroup === "全部" || channel.group === state.selectedGroup) indices.push(index);
+    if (state.selectedGroup === ALL_GROUP_ID || (channel.group || OTHER_GROUP_ID) === state.selectedGroup) indices.push(index);
   });
   return indices;
 }
@@ -78,7 +80,7 @@ export function getVisibleChannelIndices(state: ChannelBrowserState, channels: C
 function enterFocusedGroup(next: ChannelBrowserState, channels: Channel[]): void {
   const groups = getGroups(channels);
   next.focusedGroupIndex = Math.max(1, clamp(next.focusedGroupIndex, groups.length + 1));
-  next.selectedGroup = groups[next.focusedGroupIndex - 1] || "全部";
+  next.selectedGroup = groups[next.focusedGroupIndex - 1] || ALL_GROUP_ID;
   const visibleIndices = getVisibleChannelIndices(next, channels);
   if (visibleIndices.indexOf(next.focusedChannelIndex) < 0 && visibleIndices.length) {
     next.focusedChannelIndex = visibleIndices[0];
@@ -88,11 +90,11 @@ function enterFocusedGroup(next: ChannelBrowserState, channels: Channel[]): void
 
 function restoreGroup(next: ChannelBrowserState, group: unknown, channels: Channel[]): void {
   const groups = getGroups(channels);
-  const selectedGroup = String(group || "全部");
+  const selectedGroup = String(group || ALL_GROUP_ID);
   const groupIndex = groups.indexOf(selectedGroup);
   const channel = channels[next.focusedChannelIndex];
-  if (groupIndex < 0 || (selectedGroup !== "全部" && (channel?.group || "其他") !== selectedGroup)) {
-    next.selectedGroup = "全部";
+  if (groupIndex < 0 || (selectedGroup !== ALL_GROUP_ID && (channel?.group || OTHER_GROUP_ID) !== selectedGroup)) {
+    next.selectedGroup = ALL_GROUP_ID;
     next.focusedGroupIndex = 1;
     return;
   }
@@ -209,7 +211,7 @@ export function transition(current: ChannelBrowserState, event: BrowserEvent, co
 }
 
 export const channelBrowserApi = {
-  constants: {COLUMN_SOURCES, COLUMN_GROUPS, COLUMN_CHANNELS},
+  constants: {COLUMN_SOURCES, COLUMN_GROUPS, COLUMN_CHANNELS, ALL_GROUP_ID, OTHER_GROUP_ID},
   createInitialState,
   copyState,
   getGroups,

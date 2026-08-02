@@ -1,8 +1,9 @@
 import {memo, type FocusEvent, useEffect, useRef} from "react";
 import {createRoot, type Root} from "react-dom/client";
 import {flushSync} from "react-dom";
-import {getGroups} from "../core/channel-browser-state";
+import {ALL_GROUP_ID, getGroups, OTHER_GROUP_ID} from "../core/channel-browser-state";
 import type {Channel, Program, SourceView} from "../core/types";
+import {formatTime, t} from "../i18n";
 import {
   BrowserSpotlightContainer,
   focusWithSpotlight,
@@ -74,8 +75,8 @@ const SourceItem = memo(function SourceItem(props: {
     onClick={() => props.onSelect(props.index)}>
     <span className="item-accent" />
     <span className="item-copy">
-      <span className="item-title">{props.add ? "＋ 添加播放源" : props.source?.displayName || props.source?.name || "当前 M3U"}</span>
-      <span className="item-meta">{props.add ? "最多 10 个播放源" : "M3U 播放源"}</span>
+      <span className="item-title">{props.add ? t("source.addWithIcon") : props.source?.displayName || props.source?.name || t("source.currentM3u")}</span>
+      <span className="item-meta">{props.add ? t("source.limit", {count: 10}) : t("source.m3u")}</span>
     </span>
   </SpotlightButton>;
 });
@@ -102,7 +103,7 @@ const GroupItem = memo(function GroupItem(props: {
     <span className="item-accent" />
     <span className="item-copy">
       <span className="item-title">{props.name}</span>
-      <span className="item-meta">{props.edit ? "修改名称、地址或删除" : `${props.count} 个频道`}</span>
+      <span className="item-meta">{props.edit ? t("source.editDescription") : t("channel.count", {count: props.count || 0})}</span>
     </span>
   </SpotlightButton>;
 });
@@ -154,14 +155,15 @@ const ChannelItem = memo(function ChannelItem(props: {
     </span>
     <span className="item-copy">
       <span className="item-title">{props.channel.name}</span>
-      <span className="item-meta">{props.channel.group}</span>
+      <span className="item-meta">{displayGroup(props.channel.group || OTHER_GROUP_ID)}</span>
     </span>
   </SpotlightButton>;
 });
 
-function formatTime(value: Date): string {
-  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return "--:--";
-  return `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
+function displayGroup(group: string): string {
+  if (group === ALL_GROUP_ID) return t("group.all");
+  if (group === OTHER_GROUP_ID) return t("group.other");
+  return group;
 }
 
 export function createChannelPanel(options: PanelOptions) {
@@ -177,9 +179,9 @@ export function createChannelPanel(options: PanelOptions) {
 
   function render(view: ChannelPanelView): void {
     const groups = getGroups(view.channels);
-    const selectedGroup = view.selectedGroup || "全部";
+    const selectedGroup = view.selectedGroup || ALL_GROUP_ID;
     const visibleChannels = view.channels.map((channel, index) => ({channel, index}))
-      .filter(({channel}) => selectedGroup === "全部" || channel.group === selectedGroup);
+      .filter(({channel}) => selectedGroup === ALL_GROUP_ID || (channel.group || OTHER_GROUP_ID) === selectedGroup);
     const previewIndex = typeof view.previewIndex === "number" ? view.previewIndex : view.focusedIndex;
     const focusedChannel = view.channels[previewIndex];
 
@@ -190,9 +192,9 @@ export function createChannelPanel(options: PanelOptions) {
     options.panelElement.setAttribute("aria-hidden", view.open ? "false" : "true");
     options.trackElement.setAttribute("data-column", String(view.browserColumn));
     options.countElement.textContent = String(visibleChannels.length);
-    options.columnTitleElement.textContent = selectedGroup;
+    options.columnTitleElement.textContent = displayGroup(selectedGroup);
     options.epgElement.classList.toggle("is-visible", view.browserColumn === 2 && Boolean(focusedChannel));
-    options.epgTitleElement.textContent = focusedChannel?.name || "当前频道";
+    options.epgTitleElement.textContent = focusedChannel?.name || t("channel.current");
 
     flushSync(() => {
       roots[0].render(<BrowserSpotlightContainer className="spotlight-list-content" spotlightId="source-list-container"
@@ -202,11 +204,11 @@ export function createChannelPanel(options: PanelOptions) {
         {view.canAddSource && <SourceItem key="add" index={view.sources.length} add focused={view.open && view.browserColumn === 0 && view.focusedSourceIndex === view.sources.length}
           selected={false} onFocus={onSourceFocus} onSelect={onSourceSelect} />}</BrowserSpotlightContainer>);
       roots[1].render(<BrowserSpotlightContainer className="spotlight-list-content" spotlightId="group-list-container"
-        spotlightDisabled={!view.open || view.browserColumn !== 1}><GroupItem key="edit" index={0} name="编辑此播放源" edit
+        spotlightDisabled={!view.open || view.browserColumn !== 1}><GroupItem key="edit" index={0} name={t("source.edit")} edit
         focused={view.open && view.browserColumn === 1 && view.focusedGroupIndex === 0} selected={false}
         onFocus={onGroupFocus} onSelect={onGroupSelect} />
-        {groups.map((group, index) => <GroupItem key={group} index={index + 1} name={group}
-          count={group === "全部" ? view.channels.length : view.channels.filter((channel) => channel.group === group).length}
+        {groups.map((group, index) => <GroupItem key={group} index={index + 1} name={displayGroup(group)}
+          count={group === ALL_GROUP_ID ? view.channels.length : view.channels.filter((channel) => (channel.group || OTHER_GROUP_ID) === group).length}
           focused={view.open && view.browserColumn === 1 && view.focusedGroupIndex === index + 1}
           selected={group === selectedGroup} onFocus={onGroupFocus} onSelect={onGroupSelect} />)}</BrowserSpotlightContainer>);
       roots[2].render(<BrowserSpotlightContainer className="spotlight-list-content" spotlightId="channel-list-container"
@@ -216,10 +218,10 @@ export function createChannelPanel(options: PanelOptions) {
         onFocus={options.onFocus} onPreview={onPreview} onSelect={options.onSelect} getInputTime={options.getInputTime} />)}</BrowserSpotlightContainer>);
       const now = Date.now();
       roots[3].render(<>{focusedChannel && (!(view.programs || []).length
-        ? <div className="epg-empty">暂无节目单</div>
+        ? <div className="epg-empty">{t("epg.empty")}</div>
         : (view.programs || []).slice(0, 4).map((program, index) => <div key={`${program.start.getTime()}-${index}`}
           className={`epg-program${program.start.getTime() <= now && program.stop.getTime() > now ? " is-current" : ""}`}>
-          <span className="epg-time">{formatTime(program.start)}</span><span className="epg-title">{program.title || "未命名节目"}</span>
+          <span className="epg-time">{formatTime(program.start)}</span><span className="epg-title">{program.title || t("epg.unnamedProgram")}</span>
         </div>))}</>);
     });
 

@@ -2,6 +2,7 @@ import {createRoot} from "react-dom/client";
 import {flushSync} from "react-dom";
 import type {PlaylistSource} from "../core/types";
 import {focusWithSpotlight, FormSpotlightContainer, SpotlightButton, SpotlightInput} from "./spotlight";
+import {t} from "../i18n";
 
 interface FormValue { name: string; url: string }
 interface FormSettings {
@@ -48,7 +49,7 @@ export function createSourceForm(options: SourceFormOptions) {
     try {
       value.url = options.normalizeUrl(value.url);
     } catch (caught) {
-      showError(caught instanceof Error ? caught.message : "请输入有效的 M3U 地址");
+      showError(caught instanceof Error ? caught.message : t("source.invalidUrl"));
       urlInput()?.focus();
       return;
     }
@@ -61,13 +62,13 @@ export function createSourceForm(options: SourceFormOptions) {
       options.onExit();
       return;
     }
-    if (isDirty() && !options.confirm("放弃未保存的修改？")) return;
+    if (isDirty() && !options.confirm(t("source.discardConfirm"))) return;
     hide();
     options.onCancel();
   }
 
   function remove(): void {
-    if (!source || !options.confirm("确定删除这个播放源？")) return;
+    if (!source || !options.confirm(t("source.deleteConfirm"))) return;
     const deleting = source;
     hide();
     options.onDelete(deleting);
@@ -75,17 +76,17 @@ export function createSourceForm(options: SourceFormOptions) {
 
   function render(): void {
     flushSync(() => root.render(<FormSpotlightContainer className="source-form-card" spotlightId="source-form-container" key={renderKey}>
-      <p className="eyebrow">播放源</p>
-      <h2 id="source-form-title">{mode === "edit" ? "编辑播放源" : "添加播放源"}</h2>
+      <p className="eyebrow">{t("source.title")}</p>
+      <h2 id="source-form-title">{mode === "edit" ? t("source.edit") : t("source.add")}</h2>
       <p id="source-form-subtitle" className="source-form-subtitle">
-        {mode === "edit" ? "修改当前 M3U 播放源" : "添加一个电视可访问的 M3U 地址"}
+        {mode === "edit" ? t("source.editFormDescription") : t("source.addDescription")}
       </p>
       <div className="source-form-fields">
-        <label className="source-field"><span>名称（可选）</span>
+        <label className="source-field"><span>{t("source.nameOptional")}</span>
           <SpotlightInput id="source-name-input" type="text" maxLength={60} autoComplete="off" defaultValue={initial.name}
-            placeholder="例如：家庭 IPTV" />
+            placeholder={t("source.namePlaceholder")} />
         </label>
-        <label className="source-field"><span>M3U 地址（必填）</span>
+        <label className="source-field"><span>{t("source.urlRequired")}</span>
           <SpotlightInput id="source-url-input" type="url" inputMode="url" autoComplete="off" spellCheck={false}
             defaultValue={initial.url} placeholder="http://server/playlist.m3u" />
         </label>
@@ -93,10 +94,10 @@ export function createSourceForm(options: SourceFormOptions) {
       <p id="source-form-error" className="source-form-error" role="alert" hidden={!error}>{error}</p>
       <div className="source-form-actions">
         <SpotlightButton id="source-save-button" spotlightId="source-save" className="source-form-button is-primary" type="button" onClick={submit}>
-          {mode === "edit" ? "保存修改" : "添加并播放"}
+          {mode === "edit" ? t("source.saveChanges") : t("source.addAndPlay")}
         </SpotlightButton>
-        {!required && <SpotlightButton id="source-cancel-button" spotlightId="source-cancel" className="source-form-button" type="button" onClick={cancel}>取消</SpotlightButton>}
-        {mode === "edit" && <SpotlightButton id="source-delete-button" spotlightId="source-delete" className="source-form-button is-danger" type="button" onClick={remove}>删除播放源</SpotlightButton>}
+        {!required && <SpotlightButton id="source-cancel-button" spotlightId="source-cancel" className="source-form-button" type="button" onClick={cancel}>{t("common.cancel")}</SpotlightButton>}
+        {mode === "edit" && <SpotlightButton id="source-delete-button" spotlightId="source-delete" className="source-form-button is-danger" type="button" onClick={remove}>{t("source.delete")}</SpotlightButton>}
       </div>
     </FormSpotlightContainer>));
   }

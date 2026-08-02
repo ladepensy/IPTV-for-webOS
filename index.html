@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,13 +8,13 @@
   </head>
   <body>
     <main id="root" class="app-shell">
-      <section class="player-stage" aria-label="全屏播放器">
+      <section class="player-stage" aria-label="Fullscreen player" data-i18n-aria-label="player.fullscreen">
         <video id="player" autoplay playsinline></video>
         <div id="player-placeholder" class="player-placeholder">
           <div class="signal-mark" aria-hidden="true">
             <span></span><span></span><span></span>
           </div>
-          <p id="player-message">正在获取播放列表</p>
+          <p id="player-message" data-i18n="playlist.fetching">Fetching playlist</p>
           <div id="player-diagnostics" class="player-diagnostics" hidden></div>
         </div>
       </section>
@@ -25,48 +25,48 @@
             <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
             <div>
               <p class="eyebrow">IPTV for webOS</p>
-              <h1 id="current-title">正在载入频道…</h1>
+              <h1 id="current-title" data-i18n="channel.loading">Loading channels…</h1>
             </div>
           </div>
           <div class="topbar-status">
-            <span id="connection-state" class="status-pill"><span class="status-dot" aria-hidden="true"></span>连接中</span>
+            <span id="connection-state" class="status-pill"><span class="status-dot" aria-hidden="true"></span><span id="connection-state-label" data-i18n="connection.connecting">Connecting</span></span>
             <span id="clock" class="clock">--:--</span>
           </div>
         </header>
 
-        <aside id="channel-panel" class="channel-panel" aria-label="频道浏览器" aria-hidden="true">
+        <aside id="channel-panel" class="channel-panel" aria-label="Channel browser" data-i18n-aria-label="channel.browser" aria-hidden="true">
           <div id="channel-browser-track" class="channel-browser-track">
-            <section class="channel-column source-column" aria-label="M3U 播放源">
+            <section class="channel-column source-column" aria-label="M3U sources" data-i18n-aria-label="source.column">
               <div class="column-heading">
-                <p class="eyebrow">播放源</p>
+                <p class="eyebrow" data-i18n="source.title">Sources</p>
                 <strong>M3U</strong>
               </div>
               <div id="source-list" class="browser-list" role="listbox"></div>
             </section>
 
-            <section class="channel-column group-column" aria-label="频道分组">
+            <section class="channel-column group-column" aria-label="Channel groups" data-i18n-aria-label="group.column">
               <div class="column-heading">
-                <p class="eyebrow">频道分组</p>
-                <strong>选择分组</strong>
+                <p class="eyebrow" data-i18n="group.title">Groups</p>
+                <strong data-i18n="group.select">Select group</strong>
               </div>
               <div id="group-list" class="browser-list" role="listbox"></div>
             </section>
 
-            <section class="channel-column channels-column" aria-label="频道">
+            <section class="channel-column channels-column" aria-label="Channels" data-i18n-aria-label="channel.column">
               <div class="column-heading">
                 <div>
-                  <p class="eyebrow">频道</p>
-                  <strong id="channel-column-title">全部</strong>
+                  <p class="eyebrow" data-i18n="channel.title">Channels</p>
+                  <strong id="channel-column-title" data-i18n="group.all">All</strong>
                 </div>
                 <span id="channel-count" class="channel-count">0</span>
               </div>
               <div id="channel-list" class="browser-list channel-list" role="listbox"></div>
             </section>
 
-            <section id="epg-popover" class="epg-popover" aria-label="节目单" aria-live="polite">
+            <section id="epg-popover" class="epg-popover" aria-label="TV guide" data-i18n-aria-label="epg.title" aria-live="polite">
               <div class="epg-heading">
-                <p class="eyebrow">节目单</p>
-                <strong id="epg-channel-title">当前频道</strong>
+                <p class="eyebrow" data-i18n="epg.title">TV guide</p>
+                <strong id="epg-channel-title" data-i18n="channel.current">Current channel</strong>
               </div>
               <div id="epg-program-list" class="epg-program-list"></div>
             </section>
@@ -75,20 +75,21 @@
 
         <div class="now-playing">
           <div class="now-playing-copy">
-            <p class="eyebrow">正在播放</p>
-            <h2 id="now-playing-title">正在载入频道…</h2>
-            <p id="now-playing-group">按 → 浏览频道库</p>
-            <p id="now-playing-media" class="now-playing-media">清晰度未知</p>
+            <p class="eyebrow" data-i18n="nowPlaying.title">Now playing</p>
+            <h2 id="now-playing-title" data-i18n="channel.loading">Loading channels…</h2>
+            <p id="now-playing-group" data-i18n="nowPlaying.browse">Press → to browse channels</p>
+            <p id="now-playing-media" class="now-playing-media" data-i18n="media.unknownResolution">Resolution unknown</p>
             <div class="now-playing-program">
               <div class="now-playing-program-line">
-                <span id="now-playing-program-title" class="now-playing-program-title">暂无当前节目信息</span>
+                <span id="now-playing-program-title" class="now-playing-program-title" data-i18n="epg.noCurrent">No current programme information</span>
                 <span id="now-playing-program-time" class="now-playing-program-time"></span>
               </div>
               <div
                 id="now-playing-progress"
                 class="now-playing-progress"
                 role="progressbar"
-                aria-label="当前节目进度"
+                aria-label="Current programme progress"
+                data-i18n-aria-label="program.progress"
                 aria-valuemin="0"
                 aria-valuemax="100"
                 aria-valuenow="0"
@@ -101,13 +102,13 @@
         </div>
 
         <footer>
-          <span class="hint"><kbd>→</kbd><span>频道库</span></span>
-          <span class="hint"><kbd>↑</kbd><kbd>↓</kbd><span>换台 / 选择</span></span>
-          <span class="hint"><kbd>OK</kbd><span id="ok-hint-label">播放</span></span>
-          <span class="hint"><kbd>BACK</kbd><span>返回</span></span>
+          <span class="hint"><kbd>→</kbd><span data-i18n="hint.channels">Channels</span></span>
+          <span class="hint"><kbd>↑</kbd><kbd>↓</kbd><span data-i18n="hint.switchSelect">Change / Select</span></span>
+          <span class="hint"><kbd>OK</kbd><span id="ok-hint-label" data-i18n="hint.play">Play</span></span>
+          <span class="hint"><kbd>BACK</kbd><span data-i18n="hint.back">Back</span></span>
         </footer>
 
-        <section id="source-form-overlay" class="source-form-overlay" aria-label="播放源设置" aria-hidden="true"></section>
+        <section id="source-form-overlay" class="source-form-overlay" aria-label="Source settings" data-i18n-aria-label="source.settings" aria-hidden="true"></section>
       </div>
     </main>
 

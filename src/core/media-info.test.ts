@@ -20,6 +20,6 @@ describe("media info", () => {
     expect(formatMediaInfo({
       width: 0,
       height: 0
-    })).toBe("清晰度未知");
+    })).toBe("Resolution unknown");
   });
 });

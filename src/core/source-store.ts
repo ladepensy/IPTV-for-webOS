@@ -1,4 +1,6 @@
 import type {Channel, PlaylistSource} from "./types";
+import {t} from "../i18n";
+import {ALL_GROUP_ID} from "./channel-browser-state";
 
 export const STORAGE_KEY = "home-iptv:playlist-sources";
 export const MAX_SOURCES = 10;
@@ -33,9 +35,9 @@ function copyObject(value: unknown): Record<string, unknown> {
 export function displayName(source: Pick<PlaylistSource, "name" | "url">): string {
   if (String(source?.name || "").trim()) return String(source.name).trim();
   try {
-    return new URL(source.url).hostname || "未命名播放源";
+    return new URL(source.url).hostname || t("source.unnamed");
   } catch {
-    return "未命名播放源";
+    return t("source.unnamed");
   }
 }
 
@@ -45,10 +47,10 @@ export function normalizeUrl(value: unknown): string {
   try {
     parsed = new URL(url);
   } catch {
-    throw new Error("请输入有效的 M3U 地址");
+    throw new Error(t("source.invalidUrl"));
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("播放源地址必须使用 HTTP 或 HTTPS");
+    throw new Error(t("source.httpOnly"));
   }
   return url;
 }
@@ -130,14 +132,14 @@ export function create(options: {
   }
 
   function add(input: SourceInput): PlaylistSource {
-    if (data.sources.length >= MAX_SOURCES) throw new Error("播放源数量已达到上限");
+    if (data.sources.length >= MAX_SOURCES) throw new Error(t("source.limitReached"));
     const hadActiveSource = Boolean(getById(data.activeSourceId));
     const source = normalizeSource({
       id: `source_${now().toString(36)}_${Math.floor(random() * 0x1000000).toString(36)}`,
       name: input.name,
       url: input.url
     });
-    if (!source) throw new Error("请输入有效的 M3U 地址");
+    if (!source) throw new Error(t("source.invalidUrl"));
     data.sources.push(source);
     if (!hadActiveSource) data.activeSourceId = source.id;
     persist();
@@ -146,7 +148,7 @@ export function create(options: {
 
   function update(id: string, input: SourceInput): PlaylistSource {
     const source = getById(id);
-    if (!source) throw new Error("播放源不存在");
+    if (!source) throw new Error(t("source.notFound"));
     const nextUrl = normalizeUrl(input.url);
     const nextName = String(input.name || "").trim();
     const urlChanged = nextUrl !== source.url;
@@ -195,7 +197,7 @@ export function create(options: {
         channelId: entry.channel.id || "",
         name: entry.channel.name || "",
         group: entry.channel.group || "",
-        selectedGroup: String(entry.selectedGroup || "全部"),
+        selectedGroup: String(entry.selectedGroup || ALL_GROUP_ID),
         index: Number(entry.index) || 0
       };
       if (source.lastChannel && JSON.stringify(source.lastChannel) === JSON.stringify(next)) return;

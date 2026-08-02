@@ -9,7 +9,9 @@ import {parseXmltv} from "./core/xmltv";
 import {channelPanelApi} from "./ui/channel-panel";
 import {sourceFormApi} from "./ui/source-form";
 import {initializeSpotlight, spotlightApi} from "./ui/spotlight";
+import {i18nApi, t, translateDocument} from "./i18n";
 
+translateDocument();
 initializeSpotlight();
 window.IPTVChannelBrowserState = channelBrowserApi;
 window.IPTVSourceStore = sourceStoreApi;
@@ -18,13 +20,14 @@ window.IPTVMediaInfo = mediaInfoApi;
 window.IPTVChannelPanel = channelPanelApi;
 window.IPTVSourceForm = sourceFormApi;
 window.IPTVSpotlight = spotlightApi;
+window.IPTVI18n = i18nApi;
 
 function loadClassicScript(relativeUrl: string, optional = false): Promise<void> {
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
     script.src = new URL(relativeUrl, document.baseURI).href;
     script.onload = () => resolve();
-    script.onerror = () => optional ? resolve() : reject(new Error(`无法加载 ${relativeUrl}`));
+    script.onerror = () => optional ? resolve() : reject(new Error(t("script.loadFailed", {path: relativeUrl})));
     document.head.appendChild(script);
   });
 }

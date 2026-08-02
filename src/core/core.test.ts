@@ -1,7 +1,7 @@
 import {describe, expect, it} from "vitest";
 import {parseM3U} from "./m3u";
 import {create as createSourceStore, MAX_SOURCES, normalizeUrl} from "./source-store";
-import {createInitialState, transition} from "./channel-browser-state";
+import {ALL_GROUP_ID, createInitialState, getGroups, OTHER_GROUP_ID, transition} from "./channel-browser-state";
 
 function createStorage() {
   const values: Record<string, string> = {};
@@ -42,6 +42,12 @@ describe("source store core", () => {
 });
 
 describe("channel browser core", () => {
+  it("uses locale-independent IDs for built-in groups", () => {
+    expect(createInitialState().selectedGroup).toBe(ALL_GROUP_ID);
+    expect(getGroups([{id: "one", name: "One", group: "", logo: "", url: "one"}]))
+      .toEqual([ALL_GROUP_ID, OTHER_GROUP_ID]);
+  });
+
   it("keeps remote navigation deterministic", () => {
     const context = {
       sources: [{id: "home"}],

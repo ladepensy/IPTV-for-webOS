@@ -6,6 +6,7 @@ import type {spotlightApi} from "./ui/spotlight";
 import type {parseM3U} from "./core/m3u";
 import type {mediaInfoApi} from "./core/media-info";
 import type {parseXmltv} from "./core/xmltv";
+import type {i18nApi} from "./i18n";
 
 declare global {
   interface Window {
@@ -17,6 +18,7 @@ declare global {
     IPTVSpotlight: typeof spotlightApi;
     IPTVCore: {parseM3U: typeof parseM3U; parseXmltv: typeof parseXmltv};
     IPTVMediaInfo: typeof mediaInfoApi;
+    IPTVI18n: typeof i18nApi;
     IPTVInteraction: any;
     webOS?: {platformBack?: () => void};
   }

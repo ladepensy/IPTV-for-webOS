@@ -18,6 +18,7 @@
 - 5 秒没有遥控器或 Magic Remote 操作后自动隐藏界面，视频继续播放
 - 使用 Enact Spotlight 管理电视端 DOM 焦点、5-way 导航和焦点恢复；业务选择、切列、Back 与播放仍由现有状态机管理
 - 支持鼠标点击，方便在浏览器和 Simulator 中调试
+- 启动时自动匹配系统语言，支持英文、简体中文、繁体中文、日文和韩文；无法匹配时使用英文
 - 使用原生 `<video>` 播放 rtp2httpd 提供的 HTTP 视频流
 - 连续上/下换台会合并为最后一次请求，避免反复重建媒体连接
 - 普通换台延迟显示紧凑 loading，已播放画面不会立刻被全屏遮罩覆盖
@@ -33,6 +34,7 @@
 ├── styles.css     # 电视端全局界面样式
 ├── src/
 │   ├── core/      # TypeScript：M3U、XMLTV、播放源和频道浏览状态
+│   ├── i18n/      # 多语言资源、系统语言匹配和格式化
 │   ├── ui/        # React：频道库、播放源表单和 Enact Spotlight 适配
 │   └── main.tsx   # 新核心、React UI 与旧播放控制器的兼容装配
 ├── features/

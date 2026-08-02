@@ -1,6 +1,8 @@
 (function () {
   "use strict";
 
+  var i18n = window.IPTVI18n;
+  var t = i18n.t;
   var config = window.IPTV_CONFIG || {};
   var playlistConfig = config.playlist || {};
   var epgConfig = config.epg || {};
@@ -46,13 +48,16 @@
 
   var interaction = window.IPTVInteraction.create({
     maxPlaybackRetries: MAX_PLAYBACK_RETRIES,
-    getStreamInfo: getStreamInfo
+    getStreamInfo: getStreamInfo,
+    t: t
   });
   var UI_MODE_HIDDEN = interaction.constants.UI_MODE_HIDDEN;
   var UI_MODE_CHANNELS = interaction.constants.UI_MODE_CHANNELS;
   var UI_MODE_SOURCE_FORM = interaction.constants.UI_MODE_SOURCE_FORM;
   var PLAYBACK_PLAYING = interaction.constants.PLAYBACK_PLAYING;
   var PLAYBACK_RETRYING = interaction.constants.PLAYBACK_RETRYING;
+  var ALL_GROUP_ID = window.IPTVChannelBrowserState.constants.ALL_GROUP_ID;
+  var OTHER_GROUP_ID = window.IPTVChannelBrowserState.constants.OTHER_GROUP_ID;
   var state = interaction.createInitialState();
 
   var startupTimer = null;
@@ -81,6 +86,7 @@
   var uiLayer = document.getElementById("ui-layer");
   var currentTitle = document.getElementById("current-title");
   var connectionState = document.getElementById("connection-state");
+  var connectionStateLabel = document.getElementById("connection-state-label");
   var player = document.getElementById("player");
   var playerPlaceholder = document.getElementById("player-placeholder");
   var playerMessage = document.getElementById("player-message");
@@ -383,8 +389,8 @@
       !panelIsOpen ||
       browserState.column !== 2 ||
       !state.channels[pointerPreviewChannelIndex] ||
-      (browserState.selectedGroup !== "全部" &&
-        state.channels[pointerPreviewChannelIndex].group !== browserState.selectedGroup)
+      (browserState.selectedGroup !== ALL_GROUP_ID &&
+        (state.channels[pointerPreviewChannelIndex].group || OTHER_GROUP_ID) !== browserState.selectedGroup)
     ) {
       pointerPreviewChannelIndex = -1;
     }
@@ -417,37 +423,37 @@
 
     if (panelIsOpen && browserState.column === 0) {
       okHintLabel.textContent = browserState.focusedSourceIndex >= state.playlistSources.length
-        ? "添加播放源"
-        : "选择播放源";
+        ? t("source.add")
+        : t("source.select");
     } else if (panelIsOpen && browserState.column === 1) {
       okHintLabel.textContent = browserState.focusedGroupIndex === 0
-        ? "编辑播放源"
-        : "选择分组";
+        ? t("source.edit")
+        : t("group.select");
     } else if (panelIsOpen) {
-      okHintLabel.textContent = "播放频道";
+      okHintLabel.textContent = t("hint.playChannel");
     } else if (
       state.playbackStatus === interaction.constants.PLAYBACK_FAILED ||
       state.playbackStatus === interaction.constants.PLAYBACK_ENDED
     ) {
-      okHintLabel.textContent = "重试";
+      okHintLabel.textContent = t("hint.retry");
     } else {
-      okHintLabel.textContent = "播放";
+      okHintLabel.textContent = t("hint.play");
     }
 
     if (state.playlistStatus === "loading") {
-      setConnectionState("连接中", "");
+      setConnectionState(t("connection.connecting"), "");
     } else if (state.playlistStatus === "ready") {
-      setConnectionState("已连接", "is-online");
+      setConnectionState(t("connection.connected"), "is-online");
     } else if (state.playlistStatus === "unconfigured") {
-      setConnectionState("未配置", "is-error");
+      setConnectionState(t("connection.unconfigured"), "is-error");
     } else {
-      setConnectionState("连接失败", "is-error");
+      setConnectionState(t("connection.failed"), "is-error");
     }
 
     if (playingChannel) {
       currentTitle.textContent = playingChannel.name;
       nowPlayingTitle.textContent = playingChannel.name;
-      nowPlayingGroup.textContent = playingChannel.group;
+      nowPlayingGroup.textContent = displayGroup(playingChannel.group);
       renderNowPlayingProgram(playingChannel);
     } else {
       currentTitle.textContent = state.titleMessage;
@@ -546,14 +552,14 @@
 
   function getInitialChannelGroup(channels, source, channelIndex) {
     var saved = source && source.lastChannel ? source.lastChannel : null;
-    var selectedGroup = saved && saved.selectedGroup ? String(saved.selectedGroup) : "全部";
+    var selectedGroup = saved && saved.selectedGroup ? String(saved.selectedGroup) : ALL_GROUP_ID;
     var channel = channels[channelIndex];
-    if (saved && saved.sourceId && saved.sourceId !== source.id) return "全部";
-    if (selectedGroup === "全部") return selectedGroup;
-    if (!channel || channel.group !== selectedGroup) return "全部";
+    if (saved && saved.sourceId && saved.sourceId !== source.id) return ALL_GROUP_ID;
+    if (selectedGroup === ALL_GROUP_ID) return selectedGroup;
+    if (!channel || (channel.group || OTHER_GROUP_ID) !== selectedGroup) return ALL_GROUP_ID;
     return channels.some(function (item) { return item.group === selectedGroup; })
       ? selectedGroup
-      : "全部";
+      : ALL_GROUP_ID;
   }
 
   function rememberChannel(channel, index, selectedGroup) {
@@ -566,7 +572,7 @@
         group: channel.group || ""
       },
       index: index,
-      selectedGroup: selectedGroup || "全部"
+      selectedGroup: selectedGroup || ALL_GROUP_ID
     };
     clearTimeout(channelRememberTimer);
     channelRememberTimer = setTimeout(flushRememberedChannels, CHANNEL_REMEMBER_DELAY_MS);
@@ -613,6 +619,12 @@
     return options;
   }
 
+  function displayGroup(group) {
+    if (!group || group === OTHER_GROUP_ID) return t("group.other");
+    if (group === ALL_GROUP_ID) return t("group.all");
+    return group;
+  }
+
   function buildEpgRequestOptions(requestConfig) {
     requestConfig = requestConfig || EPG_REQUEST;
     var options = {
@@ -646,9 +658,7 @@
   }
 
   function formatProgramTime(date) {
-    return String(date.getHours()).padStart(2, "0") +
-      ":" +
-      String(date.getMinutes()).padStart(2, "0");
+    return i18n.formatTime(date);
   }
 
   function getCurrentProgram(channel, now) {
@@ -681,7 +691,7 @@
       nowPlayingProgramTime.textContent =
         formatProgramTime(program.start) + " – " + formatProgramTime(program.stop);
     } else {
-      nowPlayingProgramTitle.textContent = "暂无当前节目信息";
+      nowPlayingProgramTitle.textContent = t("epg.noCurrent");
       nowPlayingProgramTime.textContent = "";
     }
 
@@ -712,7 +722,7 @@
   }
 
   function setConnectionState(label, stateClass) {
-    connectionState.textContent = label;
+    connectionStateLabel.textContent = label;
     connectionState.className = "status-pill" + (stateClass ? " " + stateClass : "");
   }
 
@@ -923,7 +933,7 @@
     if (/\.(ts|m2ts)$/.test(path)) return { label: "MPEG-TS", mime: "video/mp2t" };
     if (/\.mp4$/.test(path)) return { label: "MP4", mime: "video/mp4" };
     if (/\.webm$/.test(path)) return { label: "WebM", mime: "video/webm" };
-    return { label: "由电视自动探测", mime: "" };
+    return { label: t("playback.autoDetect"), mime: "" };
   }
 
   function renderMediaInfo() {
@@ -954,7 +964,7 @@
       3: "MEDIA_ERR_DECODE",
       4: "MEDIA_ERR_SRC_NOT_SUPPORTED"
     };
-    return error && names[error.code] ? names[error.code] : "无媒体错误码";
+    return error && names[error.code] ? names[error.code] : t("playback.noMediaError");
   }
 
   function getNetworkStateName(value) {
@@ -968,7 +978,7 @@
   function sanitizeErrorMessage(error) {
     if (!error) return "";
     var message = String(error.message || error.name || "");
-    return message.replace(/https?:\/\/[^\s]+/gi, "[地址已隐藏]").slice(0, 160);
+    return message.replace(/https?:\/\/[^\s]+/gi, t("diagnostic.addressHidden")).slice(0, 160);
   }
 
   function buildPlaybackDiagnostics(reason, error, retryCount) {
@@ -976,15 +986,15 @@
     var stream = getStreamInfo(channel ? channel.url : "");
     var support = stream.mime && player.canPlayType ? player.canPlayType(stream.mime) : "";
     var details = [
-      "原因：" + reason,
-      "媒体错误：" + getMediaErrorName(player.error),
-      "网络状态：" + getNetworkStateName(player.networkState),
-      "就绪状态：" + getReadyStateName(player.readyState),
-      "流类型：" + stream.label + (support ? "（" + support + "）" : ""),
-      "重试：" + retryCount + "/" + MAX_PLAYBACK_RETRIES
+      t("diagnostic.reason", { value: reason }),
+      t("diagnostic.mediaError", { value: getMediaErrorName(player.error) }),
+      t("diagnostic.networkState", { value: getNetworkStateName(player.networkState) }),
+      t("diagnostic.readyState", { value: getReadyStateName(player.readyState) }),
+      t("diagnostic.streamType", { value: stream.label + (support ? " (" + support + ")" : "") }),
+      t("diagnostic.retry", { current: retryCount, total: MAX_PLAYBACK_RETRIES })
     ];
     var safeMessage = sanitizeErrorMessage(error);
-    if (safeMessage) details.push("浏览器信息：" + safeMessage);
+    if (safeMessage) details.push(t("diagnostic.browserMessage", { value: safeMessage }));
 
     window.__IPTV_DIAGNOSTICS__ = {
       reason: reason,
@@ -1012,7 +1022,7 @@
     stallTimer = setTimeout(function () {
       if (attemptId === state.playbackAttemptId && state.playbackHasStarted) {
         reportPlaybackFailure(
-          "缓冲超过 " + Math.round(STALL_TIMEOUT_MS / 1000) + " 秒",
+          t("reason.bufferTimeout", { seconds: Math.round(STALL_TIMEOUT_MS / 1000) }),
           null,
           attemptId
         );
@@ -1086,7 +1096,7 @@
         !state.playbackHasStarted
       ) {
         reportPlaybackFailure(
-          "起播超过 " + Math.round(STARTUP_TIMEOUT_MS / 1000) + " 秒",
+          t("reason.startupTimeout", { seconds: Math.round(STARTUP_TIMEOUT_MS / 1000) }),
           null,
           attemptId
         );
@@ -1097,7 +1107,7 @@
     if (playPromise && typeof playPromise.catch === "function") {
       playPromise.catch(function (error) {
         if (attemptId !== state.playbackAttemptId || (error && error.name === "AbortError")) return;
-        reportPlaybackFailure("play() 被拒绝", error, attemptId);
+        reportPlaybackFailure(t("reason.playRejected"), error, attemptId);
       });
     }
   }
@@ -1128,7 +1138,7 @@
         discoveredEpgUrl = "";
         var channels = parseM3U(playlist.text, playlist.baseUrl);
         if (!channels.length) {
-          throw new Error("播放列表中没有频道");
+          throw new Error(t("playlist.noChannels"));
         }
 
         sourceStore.setActive(source.id);
@@ -1159,7 +1169,7 @@
         if (currentLoadId !== playlistLoadId) return;
         dispatch({
           type: "PLAYLIST_FAILED",
-          message: error.message + " · 请确认 M3U 数据源可访问"
+          message: error.message + " · " + t("playlist.checkAccess")
         });
         publishSources();
         if (options.reopenOnFailure) {
@@ -1267,8 +1277,8 @@
     dispatch({
       type: "PLAYBACK_BUFFERING",
       attemptId: attemptId,
-      message: "正在缓冲…",
-      details: buildPlaybackDiagnostics("播放器等待数据", null, state.playbackRetryCount)
+      message: t("playback.buffering"),
+      details: buildPlaybackDiagnostics(t("reason.playerWaiting"), null, state.playbackRetryCount)
     });
   });
 
@@ -1278,8 +1288,8 @@
     dispatch({
       type: "PLAYBACK_BUFFERING",
       attemptId: attemptId,
-      message: "媒体数据暂时中断…",
-      details: buildPlaybackDiagnostics("网络数据停滞", null, state.playbackRetryCount)
+      message: t("playback.interrupted"),
+      details: buildPlaybackDiagnostics(t("reason.networkStalled"), null, state.playbackRetryCount)
     });
   });
 
@@ -1290,7 +1300,7 @@
     dispatch({
       type: "PLAYBACK_METADATA",
       attemptId: activeMediaAttemptId,
-      details: buildPlaybackDiagnostics("已读取媒体信息", null, state.playbackRetryCount)
+      details: buildPlaybackDiagnostics(t("reason.metadataLoaded"), null, state.playbackRetryCount)
     });
   });
 
@@ -1303,7 +1313,7 @@
 
   player.addEventListener("error", function () {
     if (channelSwitchTimer) return;
-    reportPlaybackFailure("媒体元素报告错误", player.error, activeMediaAttemptId);
+    reportPlaybackFailure(t("reason.mediaElementError"), player.error, activeMediaAttemptId);
   });
 
   player.addEventListener("ended", function () {
@@ -1312,7 +1322,7 @@
     dispatch({
       type: "PLAYBACK_ENDED",
       attemptId: attemptId,
-      details: buildPlaybackDiagnostics("媒体播放结束", null, state.playbackRetryCount)
+      details: buildPlaybackDiagnostics(t("reason.playbackEnded"), null, state.playbackRetryCount)
     });
   });
 

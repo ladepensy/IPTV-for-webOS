@@ -1,4 +1,5 @@
 import type {Program} from "./types";
+import {t} from "../i18n";
 
 export type ProgramIndex = Record<string, Program[]>;
 
@@ -27,7 +28,7 @@ function addProgram(index: ProgramIndex, key: string | null, program: Program): 
 
 export function parseXmltv(text: string, nowValue = Date.now()): ProgramIndex {
   const documentNode = new DOMParser().parseFromString(text, "application/xml");
-  if (documentNode.querySelector("parsererror")) throw new Error("EPG XML 格式无效");
+  if (documentNode.querySelector("parsererror")) throw new Error(t("epg.invalidXml"));
 
   const horizon = nowValue + 24 * 60 * 60 * 1000;
   const aliases: Record<string, string[]> = {};
@@ -51,7 +52,7 @@ export function parseXmltv(text: string, nowValue = Date.now()): ProgramIndex {
     const program: Program = {
       start,
       stop,
-      title: String(node.querySelector("title")?.textContent || "未命名节目").trim()
+      title: String(node.querySelector("title")?.textContent || t("epg.unnamedProgram")).trim()
     };
     (aliases[channelId] || [channelId]).forEach((key) => addProgram(programs, key, program));
   });
