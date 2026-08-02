@@ -42,6 +42,7 @@
   var UI_HIDE_DELAY_MS = 5000;
   var CHANNEL_REMEMBER_DELAY_MS = 1500;
   var LAST_CHANNEL_STORAGE_KEY = "home-iptv:last-channel";
+  var FAVORITES_STORAGE_KEY = "home-iptv:favorites";
   var playlistLoadId = 0;
 
   applySourceConfig(activeSource);
@@ -57,7 +58,10 @@
   var PLAYBACK_PLAYING = interaction.constants.PLAYBACK_PLAYING;
   var PLAYBACK_RETRYING = interaction.constants.PLAYBACK_RETRYING;
   var ALL_GROUP_ID = window.IPTVChannelBrowserState.constants.ALL_GROUP_ID;
+  var FAVORITES_GROUP_ID = window.IPTVChannelBrowserState.constants.FAVORITES_GROUP_ID;
   var OTHER_GROUP_ID = window.IPTVChannelBrowserState.constants.OTHER_GROUP_ID;
+  var CHANNEL_CONTROL_FAVORITE =
+    window.IPTVChannelBrowserState.constants.CHANNEL_CONTROL_FAVORITE;
   var state = interaction.createInitialState();
 
   var startupTimer = null;
@@ -131,8 +135,8 @@
     onGroupSelect: function (index) {
       dispatch({ type: "GROUP_SELECT", index: index });
     },
-    onFocus: function (index) {
-      dispatch({ type: "CHANNEL_FOCUS", index: index });
+    onFocus: function (index, control) {
+      dispatch({ type: "CHANNEL_FOCUS", index: index, control: control });
     },
     onPreview: function (index) {
       var nextIndex = typeof index === "number" ? index : -1;
@@ -146,6 +150,9 @@
         index: index,
         inputAt: inputAt
       });
+    },
+    onToggleFavorite: function (index) {
+      dispatch({ type: "FAVORITE_CLICK", index: index });
     },
     getInputTime: getMonotonicTime
   });
@@ -356,6 +363,9 @@
           state.channelBrowser.selectedGroup
         );
         break;
+      case "PERSIST_FAVORITES":
+        persistFavorites(state.activeSourceId, state.favoriteChannelKeys);
+        break;
       case "SCHEDULE_PLAYBACK_SWITCH":
         schedulePlaybackSwitch(currentEffect);
         break;
@@ -399,6 +409,14 @@
       browserState.column !== 2 ||
       !state.channels[pointerPreviewChannelIndex] ||
       (browserState.selectedGroup !== ALL_GROUP_ID &&
+        !(
+          browserState.selectedGroup === FAVORITES_GROUP_ID &&
+          state.favoriteChannelKeys.indexOf(
+            window.IPTVChannelBrowserState.getChannelFavoriteKey(
+              state.channels[pointerPreviewChannelIndex]
+            )
+          ) >= 0
+        ) &&
         (state.channels[pointerPreviewChannelIndex].group || OTHER_GROUP_ID) !== browserState.selectedGroup)
     ) {
       pointerPreviewChannelIndex = -1;
@@ -420,6 +438,8 @@
       focusedSourceIndex: browserState.focusedSourceIndex,
       focusedGroupIndex: browserState.focusedGroupIndex,
       focusedIndex: browserState.focusedChannelIndex,
+      focusedChannelControl: browserState.focusedChannelControl,
+      favoriteChannelKeys: state.favoriteChannelKeys,
       previewIndex: previewChannelIndex,
       playingIndex: state.playingIndex,
       programs: getChannelEpgPrograms(state.channels[previewChannelIndex]),
@@ -439,7 +459,17 @@
         ? t("source.edit")
         : t("group.select");
     } else if (panelIsOpen) {
-      okHintLabel.textContent = t("hint.playChannel");
+      var focusedBrowserChannel = state.channels[browserState.focusedChannelIndex];
+      okHintLabel.textContent =
+        browserState.selectedGroup === FAVORITES_GROUP_ID && !state.favoriteChannelKeys.length
+          ? t("favorite.emptyTitle")
+          : browserState.focusedChannelControl === CHANNEL_CONTROL_FAVORITE && focusedBrowserChannel
+        ? (state.favoriteChannelKeys.indexOf(
+          window.IPTVChannelBrowserState.getChannelFavoriteKey(
+            focusedBrowserChannel
+          )
+        ) >= 0 ? t("favorite.remove") : t("favorite.add"))
+        : t("hint.playChannel");
     } else if (
       state.playbackStatus === interaction.constants.PLAYBACK_FAILED ||
       state.playbackStatus === interaction.constants.PLAYBACK_ENDED
@@ -517,6 +547,51 @@
     return String(hash >>> 0);
   }
 
+  function readFavoriteChannelKeys(sourceId, channels) {
+    if (!sourceId) return [];
+    try {
+      var saved = JSON.parse(window.localStorage.getItem(FAVORITES_STORAGE_KEY) || "{}");
+      var savedKeys = Array.isArray(saved[sourceId])
+        ? saved[sourceId].filter(function (value) { return typeof value === "string"; })
+        : [];
+      var normalized = [];
+      savedKeys.forEach(function (savedKey) {
+        var matchedChannels;
+        if (savedKey.indexOf("id:") === 0) {
+          matchedChannels = channels.filter(function (channel) {
+            return channel.id === savedKey.slice(3);
+          });
+          if (matchedChannels.length !== 1) return;
+          savedKey = window.IPTVChannelBrowserState.getChannelFavoriteKey(matchedChannels[0]);
+        }
+        if (channels.some(function (channel) {
+          return window.IPTVChannelBrowserState.getChannelFavoriteKey(channel) === savedKey;
+        }) && normalized.indexOf(savedKey) < 0) {
+          normalized.push(savedKey);
+        }
+      });
+      return normalized;
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function persistFavorites(sourceId, favoriteChannelKeys) {
+    if (!sourceId) return;
+    var saved = {};
+    try {
+      saved = JSON.parse(window.localStorage.getItem(FAVORITES_STORAGE_KEY) || "{}") || {};
+    } catch (error) {
+      saved = {};
+    }
+    saved[sourceId] = (favoriteChannelKeys || []).slice();
+    try {
+      window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(saved));
+    } catch (error) {
+      // Favorites remain available for the current session if storage is unavailable.
+    }
+  }
+
   function getInitialChannelIndex(channels, source) {
     var saved = source && source.lastChannel ? source.lastChannel : null;
     var matchedIndex = -1;
@@ -567,6 +642,11 @@
     var channel = channels[channelIndex];
     if (saved && saved.sourceId && saved.sourceId !== source.id) return ALL_GROUP_ID;
     if (selectedGroup === ALL_GROUP_ID) return selectedGroup;
+    if (selectedGroup === FAVORITES_GROUP_ID) {
+      return channel && readFavoriteChannelKeys(source.id, channels).indexOf(
+        window.IPTVChannelBrowserState.getChannelFavoriteKey(channel)
+      ) >= 0 ? FAVORITES_GROUP_ID : ALL_GROUP_ID;
+    }
     if (!channel || (channel.group || OTHER_GROUP_ID) !== selectedGroup) return ALL_GROUP_ID;
     return channels.some(function (item) { return item.group === selectedGroup; })
       ? selectedGroup
@@ -1243,6 +1323,7 @@
           activeSourceIndex: getActiveSourceIndex(sourceViews),
           canAddSource: sourceStore.canAdd(),
           playlistName: getPlaylistDisplayName(storedSource),
+          favoriteChannelKeys: readFavoriteChannelKeys(storedSource.id, channels),
           initialIndex: initialIndex,
           initialGroup: getInitialChannelGroup(channels, storedSource, initialIndex),
           openChannels: Boolean(options.openChannels)
@@ -1265,6 +1346,23 @@
         }
       });
   }
+
+  document.addEventListener("keydown", function (event) {
+    var isChannelVerticalNavigation =
+      state.uiMode === UI_MODE_CHANNELS &&
+      state.channelBrowser.column === 2 &&
+      (event.keyCode === 38 || event.keyCode === 40) &&
+      window.IPTVSpotlight &&
+      window.IPTVSpotlight.isSpottableTarget(event.target);
+    if (!isChannelVerticalNavigation || sourceFormView.isOpen()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dispatch({
+      type: event.keyCode === 38 ? "KEY_UP" : "KEY_DOWN",
+      delta: event.keyCode === 38 ? -1 : 1,
+      inputAt: getMonotonicTime()
+    });
+  }, true);
 
   document.addEventListener("keydown", function (event) {
     if (sourceFormView.isOpen()) {

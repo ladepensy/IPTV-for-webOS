@@ -31,6 +31,7 @@ The full three-column browser for sources, groups, and channels:
 - Resolve channel URLs relative to the playlist URL.
 - Keep video full screen while showing an on-demand three-column browser for sources, groups, and channels.
 - Shift the channel browser with the active column and show current and upcoming programmes for the focused channel.
+- Keep Favorites near the top of the group list, with a remote- and pointer-friendly star button saved independently per source.
 - Discover XMLTV guides from the M3U `x-tvg-url` attribute, with an optional configuration override.
 - Resume the last selected channel on startup, or play the first channel when no valid history exists.
 - Hide the interface after five seconds without remote or Magic Remote activity while playback continues.
@@ -447,7 +448,7 @@ After initialization on the TV, edit source names and M3U addresses through the 
 
 ## Known limitations
 
-- Favorites and channel search are not implemented yet.
+- Channel search is not implemented yet.
 - Simulator media support differs from physical hardware. Final IPTV playback validation must be performed on an LG C5.
 
 ## License

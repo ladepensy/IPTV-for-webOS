@@ -2,7 +2,10 @@
 .DS_Store
 .idea/
 .vscode/
+.claude/
 node_modules/
 .pnpm-store/
 dist/
 config.js
+.vite-*.log
+design-qa.md

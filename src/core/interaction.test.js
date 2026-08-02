@@ -105,8 +105,8 @@ assert.strictEqual(state.uiMode, constants.UI_MODE_CHANNELS);
 assert.strictEqual(state.channelBrowser.column, 0);
 state = send(state, { type: "KEY_RIGHT" }).state;
 assert.strictEqual(state.channelBrowser.column, 1);
-state = send(state, { type: "KEY_DOWN", delta: 1 }).state;
-assert.strictEqual(state.channelBrowser.focusedGroupIndex, 2);
+state = send(state, { type: "KEY_DOWN", delta: 2 }).state;
+assert.strictEqual(state.channelBrowser.focusedGroupIndex, 3);
 state = send(state, { type: "KEY_RIGHT" }).state;
 assert.strictEqual(state.channelBrowser.column, 2);
 assert.strictEqual(state.channelBrowser.selectedGroup, "Test");
@@ -273,8 +273,27 @@ restoredState = send(restoredState, { type: "KEY_OK" }).state;
 assert.strictEqual(restoredState.uiMode, constants.UI_MODE_CHANNELS);
 assert.strictEqual(restoredState.channelBrowser.column, 2);
 assert.strictEqual(restoredState.channelBrowser.focusedSourceIndex, 1);
-assert.strictEqual(restoredState.channelBrowser.focusedGroupIndex, 3);
+assert.strictEqual(restoredState.channelBrowser.focusedGroupIndex, 4);
 assert.strictEqual(restoredState.channelBrowser.selectedGroup, "Sports");
 assert.strictEqual(restoredState.channelBrowser.focusedChannelIndex, 2);
+
+restoredState = send(restoredState, { type: "KEY_RIGHT" }).state;
+assert.strictEqual(
+  restoredState.channelBrowser.focusedChannelControl,
+  channelBrowserApi.constants.CHANNEL_CONTROL_FAVORITE
+);
+outcome = send(restoredState, { type: "KEY_OK" });
+restoredState = outcome.state;
+assert.strictEqual(restoredState.uiMode, constants.UI_MODE_CHANNELS);
+assert.deepStrictEqual(restoredState.favoriteChannelKeys, ["url:sports-two"]);
+assert.ok(outcome.effects.some(function (item) { return item.type === "PERSIST_FAVORITES"; }));
+assert.ok(!outcome.effects.some(function (item) { return item.type === "START_PLAYBACK"; }));
+
+outcome = send(restoredState, { type: "FAVORITE_CLICK", index: 2 });
+assert.deepStrictEqual(outcome.state.favoriteChannelKeys, []);
+assert.strictEqual(
+  outcome.state.channelBrowser.focusedChannelControl,
+  channelBrowserApi.constants.CHANNEL_CONTROL_FAVORITE
+);
 
 });

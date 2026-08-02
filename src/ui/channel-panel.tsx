@@ -1,7 +1,18 @@
 import {memo, type FocusEvent, useEffect, useRef} from "react";
 import {createRoot, type Root} from "react-dom/client";
 import {flushSync} from "react-dom";
-import {ALL_GROUP_ID, getGroups, OTHER_GROUP_ID} from "../core/channel-browser-state";
+import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
+import {faStar as regularStar} from "@fortawesome/free-regular-svg-icons";
+import {faStar as solidStar} from "@fortawesome/free-solid-svg-icons";
+import {
+  ALL_GROUP_ID,
+  CHANNEL_CONTROL_FAVORITE,
+  CHANNEL_CONTROL_PLAY,
+  FAVORITES_GROUP_ID,
+  getChannelFavoriteKey,
+  getGroups,
+  OTHER_GROUP_ID
+} from "../core/channel-browser-state";
 import type {Channel, Program, SourceView} from "../core/types";
 import {formatTime, t} from "../i18n";
 import {
@@ -22,6 +33,8 @@ interface ChannelPanelView {
   focusedSourceIndex: number;
   focusedGroupIndex: number;
   focusedIndex: number;
+  focusedChannelControl: number;
+  favoriteChannelKeys: string[];
   previewIndex?: number;
   playingIndex: number;
   programs?: Program[];
@@ -44,7 +57,8 @@ interface PanelOptions {
   onSourceSelect?: (index: number) => void;
   onGroupFocus?: (index: number) => void;
   onGroupSelect?: (index: number) => void;
-  onFocus: (index: number) => void;
+  onFocus: (index: number, control: number) => void;
+  onToggleFavorite: (index: number) => void;
   onPreview?: (index: number | null) => void;
   onSelect: (index: number, inputAt: number) => void;
   getInputTime: () => number;
@@ -111,17 +125,19 @@ const GroupItem = memo(function GroupItem(props: {
 const ChannelItem = memo(function ChannelItem(props: {
   channel: Channel;
   index: number;
-  focused: boolean;
+  focusedControl: number | null;
   playing: boolean;
+  favorite: boolean;
   shouldScroll: boolean;
-  onFocus: (index: number) => void;
+  onFocus: (index: number, control: number) => void;
   onPreview: (index: number | null) => void;
   onSelect: (index: number, inputAt: number) => void;
+  onToggleFavorite: (index: number) => void;
   getInputTime: () => number;
 }) {
   const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleFocus = (_event: FocusEvent<HTMLButtonElement>) => {
-    if (!isSpotlightPointerMode()) props.onFocus(props.index);
+  const handleFocus = (control: number) => (_event: FocusEvent<HTMLButtonElement>) => {
+    if (!isSpotlightPointerMode()) props.onFocus(props.index, control);
   };
   const cancelPreviewTimer = () => {
     if (previewTimer.current !== null) clearTimeout(previewTimer.current);
@@ -140,28 +156,45 @@ const ChannelItem = memo(function ChannelItem(props: {
   };
   useEffect(() => cancelPreviewTimer, []);
   const initial = (props.channel.name || "?").slice(0, 1).toUpperCase();
-  return <SpotlightButton type="button" role="option" aria-selected={props.focused}
-    spotlightId={`channel-${props.index}`}
-    data-index={props.index} className={itemClass("channel-item", props.focused, false, props.playing)}
-    onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} onFocus={handleFocus}
-    onClick={() => { props.onPreview(null); props.onSelect(props.index, props.getInputTime()); }}>
-    <span className="item-accent" />
-    <span className="channel-number">{props.index + 1}</span>
-    <span className="channel-logo">
-      {props.channel.logo
-        ? <img alt="" loading="lazy" src={props.channel.logo}
-          onError={(event) => { event.currentTarget.hidden = true; event.currentTarget.parentElement!.textContent = initial; }} />
-        : initial}
-    </span>
-    <span className="item-copy">
-      <span className="item-title">{props.channel.name}</span>
-      <span className="item-meta">{displayGroup(props.channel.group || OTHER_GROUP_ID)}</span>
-    </span>
-  </SpotlightButton>;
+  const playFocused = props.focusedControl === CHANNEL_CONTROL_PLAY;
+  const favoriteFocused = props.focusedControl === CHANNEL_CONTROL_FAVORITE;
+  return <div className={`channel-row${favoriteFocused ? " is-favorite-focused" : ""}`}
+    onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+    <SpotlightButton type="button" role="option" aria-selected={playFocused}
+      spotlightId={`channel-${props.index}`} data-index={props.index}
+      data-channel-focus={playFocused ? "true" : undefined}
+      className={itemClass("channel-item channel-main", playFocused, false, props.playing)}
+      onFocus={handleFocus(CHANNEL_CONTROL_PLAY)}
+      onClick={() => { props.onPreview(null); props.onSelect(props.index, props.getInputTime()); }}>
+      <span className="item-accent" />
+      <span className="channel-number">{props.index + 1}</span>
+      <span className="channel-logo">
+        {props.channel.logo
+          ? <img alt="" loading="lazy" src={props.channel.logo}
+            onError={(event) => { event.currentTarget.hidden = true; event.currentTarget.parentElement!.textContent = initial; }} />
+          : initial}
+      </span>
+      <span className="item-copy">
+        <span className="item-title">{props.channel.name}</span>
+        <span className="item-meta">{displayGroup(props.channel.group || OTHER_GROUP_ID)}</span>
+      </span>
+    </SpotlightButton>
+    <SpotlightButton type="button" spotlightId={`favorite-${props.index}`}
+      className={`favorite-button${props.favorite ? " is-favorite" : ""}${favoriteFocused ? " is-focused" : ""}`}
+      data-channel-focus={favoriteFocused ? "true" : undefined}
+      aria-label={props.favorite ? t("favorite.remove") : t("favorite.add")}
+      aria-pressed={props.favorite}
+      title={props.favorite ? t("favorite.remove") : t("favorite.add")}
+      onFocus={handleFocus(CHANNEL_CONTROL_FAVORITE)}
+      onClick={() => { props.onPreview(null); props.onToggleFavorite(props.index); }}>
+      <FontAwesomeIcon icon={props.favorite ? solidStar : regularStar} />
+    </SpotlightButton>
+  </div>;
 });
 
 function displayGroup(group: string): string {
   if (group === ALL_GROUP_ID) return t("group.all");
+  if (group === FAVORITES_GROUP_ID) return t("group.favorites");
   if (group === OTHER_GROUP_ID) return t("group.other");
   return group;
 }
@@ -180,10 +213,18 @@ export function createChannelPanel(options: PanelOptions) {
   function render(view: ChannelPanelView): void {
     const groups = getGroups(view.channels);
     const selectedGroup = view.selectedGroup || ALL_GROUP_ID;
+    const favoriteKeys = new Set(view.favoriteChannelKeys || []);
+    const isFavorite = (channel: Channel) => favoriteKeys.has(getChannelFavoriteKey(channel));
     const visibleChannels = view.channels.map((channel, index) => ({channel, index}))
-      .filter(({channel}) => selectedGroup === ALL_GROUP_ID || (channel.group || OTHER_GROUP_ID) === selectedGroup);
+      .filter(({channel}) =>
+        selectedGroup === ALL_GROUP_ID ||
+        (selectedGroup === FAVORITES_GROUP_ID && isFavorite(channel)) ||
+        (channel.group || OTHER_GROUP_ID) === selectedGroup
+      );
     const previewIndex = typeof view.previewIndex === "number" ? view.previewIndex : view.focusedIndex;
-    const focusedChannel = view.channels[previewIndex];
+    const focusedChannel = visibleChannels.some(({index}) => index === previewIndex)
+      ? view.channels[previewIndex]
+      : undefined;
 
     options.panelElement.classList.toggle("is-open", view.open);
     options.panelElement.classList.toggle("is-column-sources", view.browserColumn === 0);
@@ -208,14 +249,30 @@ export function createChannelPanel(options: PanelOptions) {
         focused={view.open && view.browserColumn === 1 && view.focusedGroupIndex === 0} selected={false}
         onFocus={onGroupFocus} onSelect={onGroupSelect} />
         {groups.map((group, index) => <GroupItem key={group} index={index + 1} name={displayGroup(group)}
-          count={group === ALL_GROUP_ID ? view.channels.length : view.channels.filter((channel) => (channel.group || OTHER_GROUP_ID) === group).length}
+          count={group === ALL_GROUP_ID
+            ? view.channels.length
+            : group === FAVORITES_GROUP_ID
+              ? view.channels.filter(isFavorite).length
+              : view.channels.filter((channel) => (channel.group || OTHER_GROUP_ID) === group).length}
           focused={view.open && view.browserColumn === 1 && view.focusedGroupIndex === index + 1}
           selected={group === selectedGroup} onFocus={onGroupFocus} onSelect={onGroupSelect} />)}</BrowserSpotlightContainer>);
       roots[2].render(<BrowserSpotlightContainer className="spotlight-list-content" spotlightId="channel-list-container"
-        spotlightDisabled={!view.open || view.browserColumn !== 2}>{visibleChannels.map(({channel, index}) => <ChannelItem key={`${channel.id}-${channel.url}-${index}`}
-        channel={channel} index={index} focused={view.open && view.browserColumn === 2 && index === view.focusedIndex}
-        playing={index === view.playingIndex} shouldScroll={Boolean(view.shouldScroll)}
-        onFocus={options.onFocus} onPreview={onPreview} onSelect={options.onSelect} getInputTime={options.getInputTime} />)}</BrowserSpotlightContainer>);
+        spotlightDisabled={!view.open || view.browserColumn !== 2}>
+        {visibleChannels.map(({channel, index}) => <ChannelItem key={`${channel.id}-${channel.url}-${index}`}
+          channel={channel} index={index}
+          focusedControl={view.open && view.browserColumn === 2 && index === view.focusedIndex
+            ? view.focusedChannelControl
+            : null}
+          favorite={isFavorite(channel)}
+          playing={index === view.playingIndex} shouldScroll={Boolean(view.shouldScroll)}
+          onFocus={options.onFocus} onPreview={onPreview} onSelect={options.onSelect}
+          onToggleFavorite={options.onToggleFavorite} getInputTime={options.getInputTime} />)}
+        {!visibleChannels.length && selectedGroup === FAVORITES_GROUP_ID &&
+          <div className="channel-empty">
+            <strong>{t("favorite.emptyTitle")}</strong>
+            <span>{t("favorite.emptyDescription")}</span>
+          </div>}
+      </BrowserSpotlightContainer>);
       const now = Date.now();
       roots[3].render(<>{focusedChannel && (!(view.programs || []).length
         ? <div className="epg-empty">{t("epg.empty")}</div>
@@ -227,7 +284,9 @@ export function createChannelPanel(options: PanelOptions) {
 
     if (view.open) {
       const activeList = [options.sourceListElement, options.groupListElement, channelList][view.browserColumn];
-      const focusedElement = activeList?.querySelector<HTMLElement>(".browser-item.is-focused") || null;
+      const focusedElement = view.browserColumn === 2
+        ? activeList?.querySelector<HTMLElement>('[data-channel-focus="true"]') || null
+        : activeList?.querySelector<HTMLElement>(".browser-item.is-focused") || null;
       if (view.shouldScroll) focusedElement?.scrollIntoView({block: "nearest"});
       focusWithSpotlight(focusedElement);
     }

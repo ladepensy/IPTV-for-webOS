@@ -30,6 +30,7 @@
     var getStreamInfo = options.getStreamInfo;
     var t = options.t || function (key) { return key; };
     var ALL_GROUP_ID = channelBrowserApi.constants.ALL_GROUP_ID || "__all__";
+    var FAVORITES_GROUP_ID = channelBrowserApi.constants.FAVORITES_GROUP_ID || "__favorites__";
     var OTHER_GROUP_ID = channelBrowserApi.constants.OTHER_GROUP_ID || "__other__";
 
     function createInitialState() {
@@ -40,6 +41,7 @@
         playlistSources: [],
         activeSourceId: "",
         canAddSource: true,
+        favoriteChannelKeys: [],
         channelBrowser: channelBrowserApi.createInitialState(0),
         playingIndex: -1,
         playbackStatus: constants.PLAYBACK_IDLE,
@@ -59,6 +61,7 @@
         result[key] = source[key];
       });
       result.channelBrowser = channelBrowserApi.copyState(source.channelBrowser);
+      result.favoriteChannelKeys = (source.favoriteChannelKeys || []).slice();
       return result;
     }
 
@@ -80,13 +83,18 @@
       return Math.max(0, Math.min(channels.length - 1, index));
     }
 
-    function getWrappedChannelIndex(index, delta, channels, selectedGroup) {
+    function getWrappedChannelIndex(index, delta, channels, selectedGroup, favoriteChannelKeys) {
       if (!channels.length) return 0;
       var currentIndex = clampChannelIndex(index, channels);
       var currentGroup = selectedGroup || ALL_GROUP_ID;
       var groupIndices = [];
       channels.forEach(function (channel, channelIndex) {
-        if (currentGroup === ALL_GROUP_ID || (channel.group || OTHER_GROUP_ID) === currentGroup) {
+        var isFavorite = (favoriteChannelKeys || []).indexOf(channelBrowserApi.getChannelFavoriteKey(channel)) >= 0;
+        if (
+          currentGroup === ALL_GROUP_ID ||
+          (currentGroup === FAVORITES_GROUP_ID && isFavorite) ||
+          (channel.group || OTHER_GROUP_ID) === currentGroup
+        ) {
           groupIndices.push(channelIndex);
         }
       });
@@ -107,7 +115,8 @@
       return {
         channels: nextState.channels,
         sources: nextState.playlistSources,
-        canAddSource: nextState.canAddSource
+        canAddSource: nextState.canAddSource,
+        favoriteChannelKeys: nextState.favoriteChannelKeys
       };
     }
 
@@ -152,6 +161,20 @@
       nextState.titleMessage = "";
     }
 
+    function toggleFavorite(nextState, index, effects) {
+      var channel = nextState.channels[index];
+      if (!channel) return;
+      var key = channelBrowserApi.getChannelFavoriteKey(channel);
+      var favoriteIndex = nextState.favoriteChannelKeys.indexOf(key);
+      if (favoriteIndex >= 0) {
+        nextState.favoriteChannelKeys.splice(favoriteIndex, 1);
+      } else {
+        nextState.favoriteChannelKeys.push(key);
+      }
+      updateChannelBrowser(nextState, { type: "FAVORITES_CHANGED", index: index });
+      effects.push(effect("PERSIST_FAVORITES"));
+    }
+
     function handleBrowserAction(nextState, action, effects) {
       if (!action) return;
       if (action.type === "ADD_SOURCE") {
@@ -171,6 +194,10 @@
         if (source && source.id !== nextState.activeSourceId) {
           effects.push(effect("LOAD_SOURCE", { index: action.index }));
         }
+        return;
+      }
+      if (action.type === "FAVORITE_TOGGLED") {
+        toggleFavorite(nextState, action.index, effects);
       }
     }
 
@@ -232,7 +259,8 @@
             currentPlayingIndex,
             event.delta,
             next.channels,
-            next.channelBrowser.selectedGroup
+            next.channelBrowser.selectedGroup,
+            next.favoriteChannelKeys
           );
 
           next.uiMode = constants.UI_MODE_INFO;
@@ -381,7 +409,23 @@
         case "CHANNEL_FOCUS":
           if (!next.channels[event.index]) break;
           next.uiMode = constants.UI_MODE_CHANNELS;
-          updateChannelBrowser(next, { type: "CHANNEL_FOCUS", index: event.index });
+          updateChannelBrowser(next, {
+            type: "CHANNEL_FOCUS",
+            index: event.index,
+            control: event.control
+          });
+          effects.push(effect("SCHEDULE_UI_HIDE"));
+          break;
+
+        case "FAVORITE_CLICK":
+          if (!next.channels[event.index]) break;
+          next.uiMode = constants.UI_MODE_CHANNELS;
+          updateChannelBrowser(next, {
+            type: "CHANNEL_FOCUS",
+            index: event.index,
+            control: channelBrowserApi.constants.CHANNEL_CONTROL_FAVORITE
+          });
+          toggleFavorite(next, event.index, effects);
           effects.push(effect("SCHEDULE_UI_HIDE"));
           break;
 
@@ -442,6 +486,7 @@
 
         case "ACTIVE_SOURCE_REMOVED":
           next.channels = [];
+          next.favoriteChannelKeys = [];
           next.playingIndex = -1;
           next.playbackStatus = constants.PLAYBACK_IDLE;
           next.playbackRetryCount = 0;
@@ -456,6 +501,7 @@
           next.channels = [];
           next.playlistSources = [];
           next.activeSourceId = "";
+          next.favoriteChannelKeys = [];
           next.playingIndex = -1;
           next.playbackStatus = constants.PLAYBACK_IDLE;
           next.uiMode = constants.UI_MODE_INFO;
@@ -470,6 +516,7 @@
           next.playlistSources = event.sources || next.playlistSources;
           next.activeSourceId = event.activeSourceId || next.activeSourceId;
           next.canAddSource = event.canAddSource !== false;
+          next.favoriteChannelKeys = (event.favoriteChannelKeys || []).slice();
           updateChannelBrowser(next, {
             type: "RESET",
             initialChannelIndex: event.initialIndex,
