@@ -1,53 +1,55 @@
 # IPTV for webOS
 
+English | [Simplified Chinese](README.zh-CN.md)
+
 *A lightweight IPTV player built for LG webOS TV.*
 
-一个面向 LG webOS TV 的轻量 IPTV Web App。应用可从任意可访问的 HTTP/HTTPS 数据源获取 M3U 播放列表，并通过电视原生媒体能力播放其中的频道。
+The app fetches M3U playlists from any accessible HTTP or HTTPS source and plays their channels through the TV's native media capabilities.
 
-## 当前功能
+## Features
 
-- 从本地配置文件指定任意 M3U 数据源
-- 可在电视端添加、编辑和删除最多 10 个 M3U 播放源，并记住上次使用的播放源
-- 支持配置请求方法、请求头、凭据和请求体
-- 解析频道名称、分组和播放地址
-- 支持 M3U 中相对于播放列表地址的频道 URL
-- 播放器始终占满屏幕，启动播放时默认显示频道信息，频道库以 M3U、分组、频道三级浮层按需打开
-- 三级频道库会随当前操作列向左移动，频道聚焦后自动显示当前及后续节目
-- 自动读取 M3U 首行 `x-tvg-url` 指向的 XMLTV 节目单，也支持通过配置覆盖 EPG 地址
-- 启动后自动播放上次选择的频道；没有有效记录时播放当前列表第一个频道
-- 5 秒没有遥控器或 Magic Remote 操作后自动隐藏界面，视频继续播放
-- 使用 Enact Spotlight 管理电视端 DOM 焦点、5-way 导航和焦点恢复；业务选择、切列、Back 与播放仍由现有状态机管理
-- 支持鼠标点击，方便在浏览器和 Simulator 中调试
-- 启动时自动匹配系统语言，支持英文、简体中文、繁体中文、日文和韩文；无法匹配时使用英文
-- 使用原生 `<video>` 播放 rtp2httpd 提供的 HTTP 视频流
-- 连续上/下换台会合并为最后一次请求，避免反复重建媒体连接
-- 普通换台延迟显示紧凑 loading，已播放画面不会立刻被全屏遮罩覆盖
-- webOS 真机自动使用低合成开销的轻量视觉模式
-- 适配 1920×1080，并兼容较低分辨率的调试窗口
+- Configure any M3U source through a local configuration file.
+- Add, edit, and delete up to 10 playlist sources directly on the TV, with the most recently used source remembered.
+- Configure request methods, headers, credentials, and request bodies.
+- Parse channel names, groups, logos, and playback URLs.
+- Resolve channel URLs relative to the playlist URL.
+- Keep video full screen while showing an on-demand three-column browser for sources, groups, and channels.
+- Shift the channel browser with the active column and show current and upcoming programmes for the focused channel.
+- Discover XMLTV guides from the M3U `x-tvg-url` attribute, with an optional configuration override.
+- Resume the last selected channel on startup, or play the first channel when no valid history exists.
+- Hide the interface after five seconds without remote or Magic Remote activity while playback continues.
+- Use Enact Spotlight for TV focus, 5-way navigation, and focus restoration.
+- Support mouse input for browser and Simulator development.
+- Match the system language at startup. English, Simplified Chinese, Traditional Chinese, Japanese, and Korean are supported; unsupported languages fall back to English.
+- Play HTTP media streams, including streams exposed by rtp2httpd, through the native `<video>` element.
+- Coalesce rapid channel changes so only the final request rebuilds the media connection.
+- Delay the compact loading indicator during ordinary channel changes so the last rendered frame is not immediately covered.
+- Enable a lower-composition-cost visual mode automatically on physical webOS TVs.
+- Target 1920×1080 while remaining usable in smaller development windows.
 
-## 项目结构
+## Project structure
 
 ```text
 .
-├── appinfo.json   # webOS 应用清单
-├── index.html     # Vite 应用入口和播放器外壳
-├── styles.css     # 电视端全局界面样式
+├── appinfo.json   # webOS application manifest
+├── index.html     # Vite entry point and player shell
+├── styles.css     # Global TV interface styles
 ├── src/
-│   ├── core/      # TypeScript：M3U、XMLTV、播放源和频道浏览状态
-│   ├── i18n/      # 多语言资源、系统语言匹配和格式化
-│   ├── ui/        # React：频道库、播放源表单和 Enact Spotlight 适配
-│   └── main.tsx   # 新核心、React UI 与旧播放控制器的兼容装配
+│   ├── core/      # TypeScript M3U, XMLTV, source, and browser state logic
+│   ├── i18n/      # Locales, system-language matching, and formatting
+│   ├── ui/        # React channel browser, source form, and Spotlight adapter
+│   └── main.tsx   # Integration layer for the new core/UI and legacy controller
 ├── features/
 │   ├── channels/
-│   │   └── channel-panel.css # 频道列表样式
+│   │   └── channel-panel.css
 │   └── sources/
-│       └── source-form.css # 播放源表单样式
-├── interaction.js # 操作状态机与事件转换
-├── app.js         # 保留的 HTMLVideoElement 播放与 webOS 副作用
-├── vite.config.ts # Web 构建和 webOS 资源复制
-├── dist/          # pnpm build 生成的 webOS 可运行目录（不提交）
-├── docs/interaction-design.md # 操作状态与事件转换规范
-├── config.example.js # 脱敏的本地配置模板
+│       └── source-form.css
+├── interaction.js # Interaction state machine and event transitions
+├── app.js         # HTMLVideoElement playback and webOS side effects
+├── vite.config.ts # Web build and webOS asset copying
+├── dist/          # Generated deployable webOS app; not committed
+├── docs/interaction-design.md
+├── config.example.js
 ├── icon.png
 ├── largeIcon.png
 └── tests/
@@ -55,18 +57,18 @@
     └── channel-panel.test.js
 ```
 
-## 开发环境
+## Development environment
 
-建议安装：
+Recommended tools:
 
 - [Visual Studio Code](https://code.visualstudio.com/)
-- LG 官方 webOS Studio 扩展
+- LG's official webOS Studio extension
 - webOS TV 25 Simulator
 - LG webOS CLI
 
-Simulator 下载及要求见 [LG webOS TV Simulator Installation](https://webostv.developer.lge.com/develop/tools/simulator-installation)。
+See [LG webOS TV Simulator Installation](https://webostv.developer.lge.com/develop/tools/simulator-installation) for Simulator downloads and requirements.
 
-安装 LG 官方 webOS CLI：
+Install the official LG webOS CLI:
 
 ```bash
 npm install -g @webos-tools/cli
@@ -74,9 +76,9 @@ ares-config --profile tv
 ares-launch --version
 ```
 
-## 本地预览
+## Local development
 
-安装项目依赖：
+Install dependencies:
 
 ```bash
 corepack enable
@@ -84,15 +86,15 @@ corepack install
 pnpm install
 ```
 
-如果当前终端仍提示找不到 `pnpm`，关闭并重新打开 PowerShell 后再执行上述命令。
+If the current terminal still cannot find `pnpm`, close and reopen PowerShell before trying again.
 
-先创建仅供本机使用的配置文件：
+Create a local-only configuration file:
 
 ```bash
 cp config.example.js config.js
 ```
 
-然后编辑 `config.js`：
+Edit `config.js`:
 
 ```js
 window.IPTV_CONFIG = {
@@ -105,19 +107,19 @@ window.IPTV_CONFIG = {
 };
 ```
 
-数据源只需返回标准 M3U 文本，不要求使用 rtp2httpd。普通静态文件服务器、NAS、反向代理、IPTV 服务或自建 API 均可作为来源。
+The source only needs to return valid M3U text. It does not have to use rtp2httpd; a static file server, NAS, reverse proxy, IPTV service, or custom API can all be used.
 
-`config.js` 已加入 `.gitignore`，不会被 Git 跟踪。不要把私人服务器地址写进源码、README 或示例配置。
+`config.js` is ignored by Git. Never place private server addresses, credentials, or tokens in source files, documentation, or example configuration.
 
-开发服务器会自动读取存在于项目根目录的本地 `config.js`：
+The development server automatically loads a local `config.js` from the project root when it exists:
 
 ```bash
 pnpm dev
 ```
 
-普通浏览器适合检查布局、M3U 解析和基本交互。遥控器焦点与部分 webOS 行为应在 Simulator 中验证；实际解码、换台和长时间播放必须在真机上验证。
+A regular browser is useful for checking layout, M3U parsing, and basic interaction. Validate remote focus and webOS behavior in the Simulator. Real decoding, channel changes, and long-running playback must be verified on a physical TV.
 
-运行 TypeScript 核心测试、旧状态机回归测试和生产构建：
+Run the TypeScript tests, legacy state-machine regression tests, and production build:
 
 ```bash
 pnpm test
@@ -129,44 +131,42 @@ node tests/source-form.test.js
 pnpm build
 ```
 
-`pnpm build` 会生成 `dist/`。出于隐私保护，构建只写入空的安全配置，不会自动把本地 `config.js` 复制进分发目录；没有预置源时，应用会在电视端打开播放源表单。
+`pnpm build` creates `dist/`. For privacy, the build writes an empty safe configuration and does not copy the local `config.js`. When no source is bundled, the app opens the source form on the TV.
 
-## Simulator 调试
+## Simulator debugging
 
-### 启动应用
+### Launch the app
 
-先运行 `pnpm build`，再使用仓库脚本校验并启动生成的 `dist/` 应用。
+Run `pnpm build`, then use the repository script to validate and launch the generated `dist/` app.
 
-Windows 使用 PowerShell 7：
+On Windows with PowerShell 7:
 
 ```powershell
 & .\.agents\skills\webos-tv-debug\scripts\run-simulator.ps1 -Version 25 -AppDir .\dist
 ```
 
-macOS 使用终端：
+On macOS:
 
 ```bash
 ./.agents/skills/webos-tv-debug/scripts/run-simulator.sh 25 "$(pwd -P)/dist"
 ```
 
-如果 Simulator 不在 webOS CLI 默认搜索目录，Windows 增加 `-SimulatorDir $env:WEBOS_SIMULATOR_DIR`，macOS 在命令末尾增加 `"$WEBOS_SIMULATOR_DIR"`。变量应指向包含 Simulator 可执行程序的已解压目录。
+If the Simulator is outside the default webOS CLI search paths, add `-SimulatorDir $env:WEBOS_SIMULATOR_DIR` on Windows or append `"$WEBOS_SIMULATOR_DIR"` on macOS. The variable must point to the extracted directory containing the Simulator executable.
 
-以下是 webOS Studio 和原始 CLI 的手工启动方式，可用于排查脚本或 Simulator 路径问题。
+You can also launch manually through webOS Studio:
 
-使用 webOS Studio：
+1. Open the project in VS Code.
+2. Right-click the project directory.
+3. Select **Run on Simulator**.
+4. Select **webOS TV 25**.
 
-1. 在 VS Code 中打开本项目。
-2. 在项目目录上右键。
-3. 选择 **Run on Simulator**。
-4. 选择 **webOS TV 25**。
-
-也可以使用命令行：
+Or use the CLI:
 
 ```bash
 ares-launch --simulator 25 .
 ```
 
-如果 Simulator 不在 webOS CLI 默认搜索目录，使用 `--simulator-path` 指定解压目录：
+Specify a nonstandard Simulator directory with `--simulator-path`:
 
 ```bash
 ares-launch \
@@ -175,20 +175,20 @@ ares-launch \
   "$APP_DIR"
 ```
 
-也可以先手动打开 Simulator，然后选择 **File > Launch App**，选中包含 `appinfo.json` 的项目根目录。
+Alternatively, open the Simulator first, choose **File > Launch App**, and select the project root containing `appinfo.json`.
 
-### 使用 Inspector
+### Inspector
 
-应用运行后，在 Simulator 菜单选择 **Tools > Inspector**，或点击遥控器区域的 **Inspect**。Inspector 可以用于：
+After launching the app, choose **Tools > Inspector** from the Simulator menu or select **Inspect** in the remote-control area. Use the Inspector to:
 
-- 查看 JavaScript 异常和 Console 输出
-- 检查播放列表与频道流的网络请求
-- 调试 DOM、CSS、焦点状态和本地存储
-- 查看 `<video>` 的 `MediaError`、`networkState` 和 `readyState`
+- Review JavaScript exceptions and console output.
+- Inspect playlist and channel network requests.
+- Debug DOM, CSS, focus state, and local storage.
+- Inspect the `<video>` element's `MediaError`, `networkState`, and `readyState`.
 
-### Simulator 的媒体限制
+### Simulator media limitations
 
-Simulator 适合测试界面、遥控器、焦点、M3U 加载和部分 webOS API，但其媒体能力不等同于电视硬件。如果 M3U 中的频道是连续 `video/mp2t` 流，TV 25 Simulator 可能返回：
+The Simulator is useful for interface, remote-control, focus, M3U-loading, and some webOS API tests, but its media support does not match TV hardware. A continuous `video/mp2t` channel may produce errors such as:
 
 ```text
 MediaError code 4
@@ -196,41 +196,41 @@ DEMUXER_ERROR_COULD_NOT_OPEN
 FormatUnsupported
 ```
 
-即使数据源自己的网页播放器能够加载频道列表，也可能因为 Simulator 无法解封装 MPEG-TS 或不支持 HEVC 而无法播放。以下项目必须以真机结果为准：
+A source's own web player may list channels successfully while the Simulator still fails to demux MPEG-TS or decode HEVC. Verify the following on a physical TV:
 
-- MPEG-TS、HLS 和直播流起播
-- H.264、HEVC、MPEG-2、4K、HDR 与隔行视频
-- AAC、AC3、EAC3、多音轨和音画同步
-- 硬件解码、连续换台、长时间播放和内存稳定性
+- MPEG-TS, HLS, and live-stream startup.
+- H.264, HEVC, MPEG-2, 4K, HDR, and interlaced video.
+- AAC, AC3, EAC3, multiple audio tracks, and A/V sync.
+- Hardware decoding, repeated channel changes, long-running playback, and memory stability.
 
-## 真机调试
+## Physical TV debugging
 
-### 1. 准备电视
+### 1. Prepare the TV
 
-电视与开发电脑必须位于同一局域网。打开电视上的 LG **Developer Mode** App：
+The TV and development computer must be on the same local network. Open LG's **Developer Mode** app on the TV:
 
-1. 登录 LG Developer 账号。
-2. 确认 **Dev Mode Status** 为 ON。
-3. 检查 **Remain Session**；需要时点击 **EXTEND**。
-4. 打开 **Key Server**。
-5. 记下 Developer Mode App 显示的 6 位 Passphrase，区分大小写。
-6. 在电视网络设置中查看电视的局域网 IP。
+1. Sign in with an LG Developer account.
+2. Confirm that **Dev Mode Status** is ON.
+3. Check **Remain Session** and select **EXTEND** when necessary.
+4. Enable **Key Server**.
+5. Note the case-sensitive six-character passphrase.
+6. Find the TV's local IP address in its network settings.
 
-Homebrew Channel 不替代 Developer Mode 的 SSH 授权；使用官方 CLI 安装开发包时仍需完成上述步骤。
+Homebrew Channel does not replace Developer Mode SSH authorization. The steps above are still required when installing development packages with the official CLI.
 
-### 2. 注册电视
+### 2. Register the TV
 
-运行：
+Run:
 
 ```bash
 ares-setup-device
 ```
 
-选择 `add`，并填写：
+Choose `add` and enter:
 
 ```text
 Device Name: myTV
-Device IP address: 电视的局域网 IP
+Device IP address: the TV's local IP address
 Device Port: 9922
 ssh user: prisoner
 description: LG TV
@@ -238,66 +238,66 @@ Set default: Yes
 Save: Yes
 ```
 
-Developer Mode 连接固定使用端口 `9922` 和用户 `prisoner`，密码留空。检查配置：
+Developer Mode connections always use port `9922` and user `prisoner`. Leave the password empty. Check the saved configuration:
 
 ```bash
 ares-setup-device --list
 ```
 
-### 3. 获取 SSH Key 并验证连接
+### 3. Obtain the SSH key and verify the connection
 
-保持电视 Developer Mode App 的 **Key Server** 为 ON：
+Keep **Key Server** enabled in the TV's Developer Mode app:
 
 ```bash
 ares-novacom --device myTV --getkey
 ```
 
-按提示输入电视上显示的 6 位 Passphrase，然后验证连接：
+Enter the six-character passphrase from the TV, then verify the connection:
 
 ```bash
 ares-device --system-info --device myTV
 ```
 
-命令能够显示电视型号、SDK 和固件版本即表示连接成功。
+The connection is working when the command reports the TV model, SDK, and firmware version.
 
-### 4. 打包、安装和启动
+### 4. Package, install, and launch
 
-确认电视连接成功后，可以在项目根目录一键完成校验、打包、安装和启动。将 `myTV` 替换成 `ares-setup-device` 中注册的设备名。
+After verifying the connection, run the repository deployment script from the project root. Replace `myTV` with the name registered through `ares-setup-device`.
 
-Windows 使用 PowerShell 7：
+On Windows with PowerShell 7:
 
 ```powershell
 & .\.agents\skills\webos-tv-debug\scripts\deploy-to-tv.ps1 -Device myTV -AppDir .\dist
 ```
 
-macOS 使用终端：
+On macOS:
 
 ```bash
 ./.agents/skills/webos-tv-debug/scripts/deploy-to-tv.sh myTV "$(pwd -P)/dist"
 ```
 
-需要同时打开 Inspector 时，Windows 在命令末尾增加 `-Inspect`，macOS 增加 `--inspect`。部署脚本使用临时目录生成 IPK，不会为了覆盖安装而修改本地 `appinfo.json` 版本号。
+To open the Inspector as well, append `-Inspect` on Windows or `--inspect` on macOS. The deployment scripts create the IPK in a temporary directory and do not modify the local `appinfo.json` version for overwrite installation.
 
-也可以手工依次运行：
+The equivalent manual commands are:
 
 ```bash
-# 打包
+# Package
 ares-package dist
 
-# 安装；myTV 替换为注册时设置的设备名
+# Install; replace myTV with the registered device name
 ares-install --device myTV com.odyssey.webos.iptv_0.1.0_all.ipk
 
-# 启动
+# Launch
 ares-launch --device myTV com.odyssey.webos.iptv
 ```
 
-默认构建不会把私人 `config.js` 打进 IPK，首次启动时可直接在电视端添加播放源。如果确实需要预置源，应在本机完成构建后自行将配置放入 `dist/config.js`，确认目标地址可由电视访问，并且不要提交或分享该目录及其 IPK。生成的 `*.ipk`、`dist/` 和本地 `config.js` 均已被 `.gitignore` 忽略。
+The default build does not include a private `config.js` in the IPK. Add a source directly on the TV after first launch. If a preconfigured source is required, build locally, place the configuration in `dist/config.js`, confirm the TV can reach it, and do not commit or share that directory or IPK. `*.ipk`, `dist/`, and the local `config.js` are ignored by Git.
 
-代码修改后，重新执行打包、安装和启动命令即可覆盖开发版本。
+Run the package, install, and launch commands again after code changes to overwrite the development installation.
 
-### 5. 真机 Inspector
+### 5. Physical TV Inspector
 
-应用在电视上运行后执行：
+With the app running on the TV:
 
 ```bash
 ares-inspect \
@@ -306,57 +306,59 @@ ares-inspect \
   --open
 ```
 
-真机 Inspector 适合检查实际频道请求、媒体错误、JavaScript 异常和播放状态。关闭应用：
+Use the physical TV Inspector for real channel requests, media errors, JavaScript exceptions, and playback state. Close the app with:
 
 ```bash
 ares-launch --device myTV --close com.odyssey.webos.iptv
 ```
 
-### 调试范围建议
+### Recommended validation scope
 
-| 环境 | 适合验证 | 不应作为最终结论 |
+| Environment | Suitable for | Do not treat as final proof of |
 | --- | --- | --- |
-| 普通浏览器 | 页面布局、M3U 解析、数据逻辑、鼠标交互 | webOS API、遥控器、电视解码能力 |
-| TV Simulator | 1920×1080 布局、遥控器按键、焦点、生命周期、Inspector | MPEG-TS、HEVC、4K、硬件解码和性能 |
-| LG 真机 | 实际音视频解码、换台、局域网、遥控器、性能与稳定性 | 最终验收应以此环境为准 |
+| Browser | Layout, M3U parsing, data logic, mouse interaction | webOS APIs, remote input, TV decoding |
+| TV Simulator | 1920×1080 layout, remote keys, focus, lifecycle, Inspector | MPEG-TS, HEVC, 4K, hardware decoding, performance |
+| Physical LG TV | Real decoding, channel changes, LAN access, remote input, performance, stability | Final acceptance should be based here |
 
-### 常见连接问题
+### Common connection problems
 
-- `ares-novacom --getkey` 失败：确认 Key Server 为 ON、IP 正确，并重新输入区分大小写的 Passphrase。
-- 端口连接失败：确认使用 `9922`，电脑与电视处于同一局域网，路由器未启用客户端隔离。
-- Developer Mode 突然失效：检查 Remain Session；过期前在 Developer Mode App 中点击 EXTEND。
-- 应用能打开但列表加载失败：在第二列选择“编辑此播放源”，确认服务器地址可由电视访问，并检查服务器防火墙与 CORS。
-- 列表正常但频道无法播放：在真机 Inspector 查看 `MediaError`，并核对频道容器、视频编码和音频编码。
+- `ares-novacom --getkey` fails: confirm that Key Server is ON, the IP address is correct, and the passphrase has the correct case.
+- The port connection fails: confirm port `9922`, verify both devices are on the same network, and make sure the router does not isolate clients.
+- Developer Mode stops working: check **Remain Session** and select **EXTEND** before it expires.
+- The app opens but the playlist fails: choose **Edit source** in the second column, verify that the TV can reach the server, and check its firewall and CORS settings.
+- Channels are listed but do not play: inspect `MediaError` on the physical TV and verify the stream container, video codec, and audio codec.
 
-LG 官方文档：
+Official LG documentation:
 
-- [Developer Mode App 真机连接](https://webostv.developer.lge.com/develop/getting-started/developer-mode-app)
+- [Developer Mode App](https://webostv.developer.lge.com/develop/getting-started/developer-mode-app)
 - [webOS CLI Developer Guide](https://webostv.developer.lge.com/develop/tools/cli-dev-guide)
 - [Simulator Developer Guide](https://webostv.developer.lge.com/develop/tools/simulator-dev-guide)
 
-## 遥控器操作
+## Remote controls
 
-| 按键 | 行为 |
+| Input | Behavior |
 | --- | --- |
-| 右 | 打开频道库；在频道库内依次进入 M3U、分组、频道列 |
-| 左 | 在频道库内返回上一列；从 M3U 列返回播放信息 |
-| 上 / 下 | 信息界面或隐藏状态下直接换台；频道库打开时在当前列移动焦点 |
-| OK | 界面隐藏时先显示信息；在 M3U/分组列进入下一列；在频道列播放选中频道 |
-| Back | 信息或频道列表可见时隐藏界面；界面已经隐藏时弹出系统退出确认 |
-| Page Up / Page Down | 在电脑调试时快速跳过 8 个频道 |
-| Magic Remote 指针 | 悬停频道时同步焦点，点击播放 |
-| Magic Remote 滚轮 | 向上或向下移动一个频道 |
+| Right | Open the channel browser; move through the source, group, and channel columns |
+| Left | Return to the previous browser column; return from the source column to playback information |
+| Up / Down | Change channels from the info or hidden state; move focus within the active browser column |
+| OK | Reveal hidden UI; advance through source/group columns; play the selected channel |
+| Back | Hide visible info or the channel browser; show the system exit confirmation when already hidden |
+| Page Up / Page Down | Skip eight channels during desktop development |
+| Magic Remote pointer | Synchronize focus on hover and play on click |
+| Magic Remote wheel | Move one channel up or down |
 
-界面隐藏时，导航上/下会直接换台并显示频道信息，右键会打开频道库，其他普通按键和指针操作只显示信息界面；Back 会弹出系统退出确认。连续 5 秒没有操作后，顶部状态、频道库、正在播放信息和操作提示都会隐藏，底层视频不会暂停或停止。播放失败或结束时，频道库未打开且界面可见时按 OK 会优先直接重播当前频道；频道库打开时仍可正常进入分组或确认新频道。
+When the UI is hidden, Up and Down change channels and show playback information, while Right opens the channel browser. Other ordinary keys and pointer activity only reveal the info view. Back invokes the system exit confirmation. After five seconds without input, the top status, browser, now-playing information, and hints are hidden without pausing or stopping video. If playback fails or ends, OK retries the current channel when the browser is closed; browser navigation remains unchanged while it is open.
 
-## M3U 数据源配置
+## M3U source configuration
 
-应用会把电视端管理的播放源保存在本地存储中。首次升级时，如果本地还没有初始化播放源，会将未跟踪的 `config.js` 播放列表配置自动导入为第一个播放源；完成初始化后，以电视端保存的播放源为准。推荐的首次引导配置格式：
+Sources managed on the TV are stored in local storage. On first initialization, when no stored source state exists, the app imports the untracked `config.js` playlist as its first source. The TV-managed source list becomes authoritative after initialization.
+
+Recommended initial configuration:
 
 ```js
 window.IPTV_CONFIG = {
   playlist: {
-    name: "家庭 IPTV",
+    name: "Home IPTV",
     url: "http://YOUR_M3U_SERVER/playlist.m3u",
     request: {
       method: "GET"
@@ -379,17 +381,17 @@ window.IPTV_CONFIG = {
 };
 ```
 
-`epg.url` 留空时，应用会自动读取 `#EXTM3U` 首行的 `x-tvg-url`。rtp2httpd 常见的 `.xml.gz` 声明会自动切换到对应 XML 地址，并使用 XMLTV 的 `channel` / `display-name` 与 M3U 的 `tvg-id`、`tvg-name` 和频道名进行匹配。只有需要覆盖 M3U 声明时才填写 `epg.url`。
+When `epg.url` is empty, the app reads `x-tvg-url` from the `#EXTM3U` header. Common rtp2httpd `.xml.gz` declarations are converted to their corresponding XML addresses. XMLTV `channel` and `display-name` values are matched against M3U `tvg-id`, `tvg-name`, and channel names. Set `epg.url` only when overriding the M3U declaration.
 
-`playback` 为可选播放配置：起播超过 `startupTimeoutMs`，或者已经播放后连续缓冲超过 `stallTimeoutMs`，应用会按 `retryDelayMs` 间隔重新加载当前频道，最多重试 `maxRetries` 次。`channelSwitchDelayMs` 用于合并连续上/下换台，`loadingIndicatorDelayMs` 控制普通换台多久后才显示紧凑 loading。切换频道或手动按 OK 会重置重试次数。
+The `playback` object is optional. The app reloads the current channel when startup exceeds `startupTimeoutMs` or continuous buffering after playback exceeds `stallTimeoutMs`. Retries use `retryDelayMs` and stop after `maxRetries`. `channelSwitchDelayMs` coalesces rapid Up/Down changes, while `loadingIndicatorDelayMs` controls when the compact loading indicator appears. Changing channels or pressing OK manually resets the retry count.
 
-`ui.simpleMode` 默认是 `"auto"`，在 webOS 运行时自动关闭模糊滤镜、重阴影、平滑滚动和较长动画。也可以设为 `true` / `"on"` 强制开启，或设为 `false` / `"off"` 强制关闭。
+`ui.simpleMode` defaults to `"auto"`, which disables blur filters, heavy shadows, smooth scrolling, and longer animations in the webOS runtime. Use `true` or `"on"` to force it on, or `false` or `"off"` to force it off.
 
-调试换台耗时时可以在 Inspector 中读取 `window.__IPTV_PERFORMANCE__`。对象只包含最近一次尝试的阶段耗时和尝试编号，不包含频道名称、播放地址、请求头或原始错误信息。
+For channel-change timing, inspect `window.__IPTV_PERFORMANCE__`. It contains phase timings and an attempt number for the most recent request, but never includes channel names, playback URLs, request headers, or raw error messages.
 
-播放失败时界面会显示脱敏诊断，包括 `MediaError`、`networkState`、`readyState`、推断的流类型和已用重试次数。诊断不会显示频道 URL、查询参数或请求头。`MEDIA_ERR_SRC_NOT_SUPPORTED` 只表示当前目标无法打开该媒体，不等同于服务器不可访问；Simulator 上的 MPEG-TS、HEVC 等错误仍需在真机复现。
+Playback failures show redacted diagnostics including `MediaError`, `networkState`, `readyState`, inferred stream type, and retry count. Diagnostics omit channel URLs, query parameters, and request headers. `MEDIA_ERR_SRC_NOT_SUPPORTED` only means that the current target could not open the media; it does not prove the server is unreachable. MPEG-TS and HEVC errors from the Simulator must still be reproduced on a physical TV.
 
-以下请求选项可按数据源需要添加，最终会传给浏览器的 `fetch`：
+Additional `fetch` options may be configured when required by the source:
 
 ```js
 window.IPTV_CONFIG = {
@@ -408,9 +410,9 @@ window.IPTV_CONFIG = {
 };
 ```
 
-支持的请求字段包括 `method`、`headers`、`body`、`credentials`、`mode`、`redirect`、`referrer`、`referrerPolicy` 和 `cache`。不需要特殊请求配置时只填写 `url` 即可。
+Supported request fields are `method`, `headers`, `body`, `credentials`, `mode`, `redirect`, `referrer`, `referrerPolicy`, and `cache`. Set only `url` when no custom request behavior is needed.
 
-旧格式仍然兼容：
+The legacy format remains supported:
 
 ```js
 window.IPTV_CONFIG = {
@@ -418,23 +420,23 @@ window.IPTV_CONFIG = {
 };
 ```
 
-数据源要求：
+Source requirements:
 
-- 响应正文必须是 M3U 文本。支持带 `#EXTINF` 元数据的扩展 M3U，也支持仅包含频道地址的简单 M3U；简单列表会使用自动生成的频道名。
-- HTTP 状态码应为 2xx。
-- 跨域数据源应允许电视应用访问，例如返回合适的 `Access-Control-Allow-Origin`。
-- M3U 中可以使用绝对频道 URL，也可以使用相对于最终播放列表 URL 的相对地址。
-- 频道流的容器和编码仍须由目标电视支持；能够获取 M3U 不代表所有频道都一定可播放。
+- The response body must contain M3U text. Both extended M3U with `#EXTINF` metadata and simple URL-only lists are supported; simple lists receive generated channel names.
+- HTTP responses must have a 2xx status.
+- Cross-origin sources must allow access from the TV app, for example through an appropriate `Access-Control-Allow-Origin` header.
+- Channel entries may use absolute URLs or URLs relative to the final playlist address.
+- Stream containers and codecs must be supported by the target TV. Fetching a playlist successfully does not guarantee that every channel can be played.
 
-rtp2httpd 只是可选数据源之一。例如使用它时可以将 `url` 设置为 `http://<server>:5140/playlist.m3u`；也可以替换为任何其他能够返回 M3U 的服务。
+rtp2httpd is only one possible source. When using it, for example, set `url` to `http://<server>:5140/playlist.m3u`. Any other service that returns valid M3U can be used instead.
 
-电视端初始化完成后，名称和 M3U 地址应通过播放源编辑界面修改。`config.js` 主要用于首次导入以及带请求头、请求体等高级请求配置的部署场景；认证 Token 等私人信息只能保存在未跟踪的 `config.js` 中，不应提交到仓库。
+After initialization on the TV, edit source names and M3U addresses through the source form. `config.js` is intended for first import and deployments requiring advanced headers or request bodies. Authentication tokens and other private values must remain in the untracked local `config.js` and must never be committed.
 
-## 已知限制
+## Known limitations
 
-- 收藏和频道搜索尚未实现。
-- Simulator 的音视频支持与真机不同，IPTV 播放必须在 LG C5 上进行最终验证。
+- Favorites and channel search are not implemented yet.
+- Simulator media support differs from physical hardware. Final IPTV playback validation must be performed on an LG C5.
 
 ## License
 
-Private project. 未经授权请勿分发。
+Private project. Unauthorized distribution is prohibited.
