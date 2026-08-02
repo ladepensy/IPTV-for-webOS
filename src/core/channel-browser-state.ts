@@ -25,6 +25,9 @@ export interface BrowserEvent {
   playingIndex?: number;
   initialChannelIndex?: number;
   initialSourceIndex?: number;
+  initialGroup?: string;
+  activeSourceIndex?: number;
+  selectedGroup?: string;
 }
 
 export interface BrowserAction {
@@ -49,6 +52,10 @@ export function copyState(source: ChannelBrowserState): ChannelBrowserState {
 
 function clamp(index: number, length: number): number {
   return length ? Math.max(0, Math.min(length - 1, index)) : 0;
+}
+
+function wrap(index: number, length: number): number {
+  return length ? ((index % length) + length) % length : 0;
 }
 
 export function getGroups(channels: Channel[]): string[] {
@@ -79,6 +86,20 @@ function enterFocusedGroup(next: ChannelBrowserState, channels: Channel[]): void
   next.column = COLUMN_CHANNELS;
 }
 
+function restoreGroup(next: ChannelBrowserState, group: unknown, channels: Channel[]): void {
+  const groups = getGroups(channels);
+  const selectedGroup = String(group || "全部");
+  const groupIndex = groups.indexOf(selectedGroup);
+  const channel = channels[next.focusedChannelIndex];
+  if (groupIndex < 0 || (selectedGroup !== "全部" && (channel?.group || "其他") !== selectedGroup)) {
+    next.selectedGroup = "全部";
+    next.focusedGroupIndex = 1;
+    return;
+  }
+  next.selectedGroup = selectedGroup;
+  next.focusedGroupIndex = groupIndex + 1;
+}
+
 function move(next: ChannelBrowserState, delta: number, context: ChannelBrowserContext): void {
   if (next.column === COLUMN_SOURCES) {
     next.focusedSourceIndex = clamp(next.focusedSourceIndex + delta, context.sources.length + (context.canAddSource ? 1 : 0));
@@ -91,7 +112,7 @@ function move(next: ChannelBrowserState, delta: number, context: ChannelBrowserC
   const visibleIndices = getVisibleChannelIndices(next, context.channels);
   let position = visibleIndices.indexOf(next.focusedChannelIndex);
   if (position < 0) position = 0;
-  position = clamp(position + delta, visibleIndices.length);
+  position = wrap(position + delta, visibleIndices.length);
   if (visibleIndices.length) next.focusedChannelIndex = visibleIndices[position];
 }
 
@@ -105,11 +126,16 @@ export function transition(current: ChannelBrowserState, event: BrowserEvent, co
   const eventIndex = Number(event.index);
 
   switch (event.type) {
-    case "RESET":
-      return result(createInitialState(event.initialChannelIndex, event.initialSourceIndex));
+    case "RESET": {
+      const reset = createInitialState(event.initialChannelIndex, event.initialSourceIndex);
+      restoreGroup(reset, event.initialGroup, context.channels);
+      return result(reset);
+    }
     case "OPEN":
       next.column = COLUMN_SOURCES;
       if (Number(event.playingIndex) >= 0) next.focusedChannelIndex = Number(event.playingIndex);
+      if (Number(event.activeSourceIndex) >= 0) next.focusedSourceIndex = Number(event.activeSourceIndex);
+      restoreGroup(next, event.selectedGroup || next.selectedGroup, context.channels);
       return result(next);
     case "MOVE":
       move(next, Number(event.delta) || 0, context);

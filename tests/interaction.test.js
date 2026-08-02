@@ -56,9 +56,10 @@ assert.strictEqual(outcome.effects[0].inputAt, 123);
 
 state = send(state, { type: "KEY_RIGHT" }).state;
 assert.strictEqual(state.uiMode, constants.UI_MODE_CHANNELS);
-assert.strictEqual(state.channelBrowser.column, 0);
+assert.strictEqual(state.channelBrowser.column, 2);
+assert.strictEqual(state.channelBrowser.focusedChannelIndex, state.playingIndex);
 assert.strictEqual(state.playlistSources.length, 1);
-state = send(state, { type: "KEY_RIGHT" }).state;
+state = send(state, { type: "KEY_LEFT" }).state;
 assert.strictEqual(state.channelBrowser.column, 1);
 state = send(state, { type: "KEY_DOWN", delta: 1 }).state;
 assert.strictEqual(state.channelBrowser.focusedGroupIndex, 2);
@@ -178,5 +179,58 @@ state.canAddSource = true;
 state.uiMode = constants.UI_MODE_CHANNELS;
 outcome = send(state, { type: "KEY_DOWN", delta: 1 });
 assert.strictEqual(outcome.state.channelBrowser.focusedSourceIndex, 1);
+
+var groupedState = machine.createInitialState();
+groupedState = send(groupedState, {
+  type: "PLAYLIST_READY",
+  channels: [
+    { name: "News One", group: "News", url: "news-one" },
+    { name: "Sports One", group: "Sports", url: "sports-one" },
+    { name: "News Two", group: "News", url: "news-two" },
+    { name: "Sports Two", group: "Sports", url: "sports-two" }
+  ],
+  sources: [{ id: "source-home", name: "Home" }],
+  activeSourceId: "source-home",
+  initialIndex: 2
+}).state;
+groupedState = send(groupedState, { type: "KEY_DOWN", delta: 1 }).state;
+assert.strictEqual(groupedState.playingIndex, 3);
+groupedState = send(groupedState, { type: "KEY_DOWN", delta: 1 }).state;
+assert.strictEqual(groupedState.playingIndex, 0);
+groupedState = send(groupedState, { type: "KEY_UP", delta: -1 }).state;
+assert.strictEqual(groupedState.playingIndex, 3);
+
+groupedState.playingIndex = 2;
+groupedState.channelBrowser.focusedChannelIndex = 2;
+groupedState.channelBrowser.selectedGroup = "News";
+groupedState = send(groupedState, { type: "KEY_DOWN", delta: 1 }).state;
+assert.strictEqual(groupedState.playingIndex, 0);
+groupedState = send(groupedState, { type: "KEY_UP", delta: -1 }).state;
+assert.strictEqual(groupedState.playingIndex, 2);
+
+var restoredState = machine.createInitialState();
+restoredState = send(restoredState, {
+  type: "PLAYLIST_READY",
+  channels: [
+    { name: "News", group: "News", url: "news" },
+    { name: "Sports One", group: "Sports", url: "sports-one" },
+    { name: "Sports Two", group: "Sports", url: "sports-two" }
+  ],
+  sources: [
+    { id: "source-primary", name: "Primary" },
+    { id: "source-backup", name: "Backup" }
+  ],
+  activeSourceId: "source-backup",
+  activeSourceIndex: 1,
+  initialIndex: 2,
+  initialGroup: "Sports"
+}).state;
+restoredState = send(restoredState, { type: "KEY_OK" }).state;
+assert.strictEqual(restoredState.uiMode, constants.UI_MODE_CHANNELS);
+assert.strictEqual(restoredState.channelBrowser.column, 2);
+assert.strictEqual(restoredState.channelBrowser.focusedSourceIndex, 1);
+assert.strictEqual(restoredState.channelBrowser.focusedGroupIndex, 3);
+assert.strictEqual(restoredState.channelBrowser.selectedGroup, "Sports");
+assert.strictEqual(restoredState.channelBrowser.focusedChannelIndex, 2);
 
 process.stdout.write("interaction tests passed\n");

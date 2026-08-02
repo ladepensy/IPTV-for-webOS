@@ -56,8 +56,12 @@ export function focusWithSpotlight(element: HTMLElement | null): boolean {
   return focus(element);
 }
 
+export function isSpotlightPointerMode(): boolean {
+  return Spotlight.getPointerMode();
+}
+
 export function isSpottableTarget(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest(".spottable"));
 }
 
-export const spotlightApi = {focus: focusWithSpotlight, isSpottableTarget};
+export const spotlightApi = {focus: focusWithSpotlight, isPointerMode: isSpotlightPointerMode, isSpottableTarget};

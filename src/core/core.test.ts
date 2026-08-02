@@ -57,4 +57,54 @@ describe("channel browser core", () => {
     expect(outcome.action).toMatchObject({type: "GROUP_SELECTED", group: "Sports"});
     expect(outcome.state.focusedChannelIndex).toBe(1);
   });
+
+  it("wraps within the selected channel group", () => {
+    const context = {
+      sources: [{id: "home"}],
+      canAddSource: true,
+      channels: [
+        {id: "news", name: "News", group: "News", logo: "", url: "news"},
+        {id: "sports-one", name: "Sports One", group: "Sports", logo: "", url: "sports-one"},
+        {id: "sports-two", name: "Sports Two", group: "Sports", logo: "", url: "sports-two"}
+      ]
+    };
+    let state = createInitialState(1);
+    state = transition(state, {type: "RIGHT"}, context).state;
+    state = transition(state, {type: "MOVE", delta: 2}, context).state;
+    state = transition(state, {type: "RIGHT"}, context).state;
+    state = transition(state, {type: "MOVE", delta: 1}, context).state;
+    expect(state.focusedChannelIndex).toBe(2);
+    state = transition(state, {type: "MOVE", delta: 1}, context).state;
+    expect(state.focusedChannelIndex).toBe(1);
+    state = transition(state, {type: "MOVE", delta: -1}, context).state;
+    expect(state.focusedChannelIndex).toBe(2);
+  });
+
+  it("restores the source, group and playing channel focus", () => {
+    const context = {
+      sources: [{id: "primary"}, {id: "backup"}],
+      canAddSource: true,
+      channels: [
+        {id: "news", name: "News", group: "News", logo: "", url: "news"},
+        {id: "sports-one", name: "Sports One", group: "Sports", logo: "", url: "sports-one"},
+        {id: "sports-two", name: "Sports Two", group: "Sports", logo: "", url: "sports-two"}
+      ]
+    };
+    let state = transition(createInitialState(), {
+      type: "RESET",
+      initialChannelIndex: 2,
+      initialSourceIndex: 1,
+      initialGroup: "Sports"
+    }, context).state;
+    state = transition(state, {
+      type: "OPEN",
+      playingIndex: 2,
+      activeSourceIndex: 1,
+      selectedGroup: "Sports"
+    }, context).state;
+    expect(state.focusedSourceIndex).toBe(1);
+    expect(state.focusedGroupIndex).toBe(3);
+    expect(state.selectedGroup).toBe("Sports");
+    expect(state.focusedChannelIndex).toBe(2);
+  });
 });

@@ -73,6 +73,7 @@
   var lastWheelEventAt = 0;
   var lastWheelStepAt = 0;
   var lastPointerActivityAt = 0;
+  var pointerPreviewChannelIndex = -1;
   var discoveredEpgUrl = "";
   var epgProgramsByChannel = {};
   var pendingChannelMemories = {};
@@ -118,6 +119,12 @@
     },
     onFocus: function (index) {
       dispatch({ type: "CHANNEL_FOCUS", index: index });
+    },
+    onPreview: function (index) {
+      var nextIndex = typeof index === "number" ? index : -1;
+      if (pointerPreviewChannelIndex === nextIndex) return;
+      pointerPreviewChannelIndex = nextIndex;
+      renderState(state, { type: "CHANNEL_PREVIEW" });
     },
     onSelect: function (index, inputAt) {
       dispatch({
@@ -328,7 +335,11 @@
         }
         break;
       case "REMEMBER_CHANNEL":
-        rememberChannel(state.channels[state.playingIndex], state.playingIndex);
+        rememberChannel(
+          state.channels[state.playingIndex],
+          state.playingIndex,
+          state.channelBrowser.selectedGroup
+        );
         break;
       case "SCHEDULE_PLAYBACK_SWITCH":
         schedulePlaybackSwitch(currentEffect);
@@ -368,6 +379,19 @@
     var playingChannel = state.channels[state.playingIndex];
     var browserState = state.channelBrowser;
 
+    if (
+      !panelIsOpen ||
+      browserState.column !== 2 ||
+      !state.channels[pointerPreviewChannelIndex] ||
+      (browserState.selectedGroup !== "全部" &&
+        state.channels[pointerPreviewChannelIndex].group !== browserState.selectedGroup)
+    ) {
+      pointerPreviewChannelIndex = -1;
+    }
+    var previewChannelIndex = pointerPreviewChannelIndex >= 0
+      ? pointerPreviewChannelIndex
+      : browserState.focusedChannelIndex;
+
     uiLayer.classList.toggle("is-hidden", uiIsHidden);
     uiLayer.classList.toggle("is-source-form-open", sourceFormIsOpen);
     channelPanelView.render({
@@ -381,8 +405,9 @@
       focusedSourceIndex: browserState.focusedSourceIndex,
       focusedGroupIndex: browserState.focusedGroupIndex,
       focusedIndex: browserState.focusedChannelIndex,
+      previewIndex: previewChannelIndex,
       playingIndex: state.playingIndex,
-      programs: getChannelEpgPrograms(state.channels[browserState.focusedChannelIndex]),
+      programs: getChannelEpgPrograms(state.channels[previewChannelIndex]),
       shouldScroll: panelIsOpen &&
         interaction.shouldScrollForEvent(event) &&
         (previousState.uiMode !== UI_MODE_CHANNELS ||
@@ -519,7 +544,19 @@
     return matchedIndex >= 0 ? matchedIndex : 0;
   }
 
-  function rememberChannel(channel, index) {
+  function getInitialChannelGroup(channels, source, channelIndex) {
+    var saved = source && source.lastChannel ? source.lastChannel : null;
+    var selectedGroup = saved && saved.selectedGroup ? String(saved.selectedGroup) : "全部";
+    var channel = channels[channelIndex];
+    if (saved && saved.sourceId && saved.sourceId !== source.id) return "全部";
+    if (selectedGroup === "全部") return selectedGroup;
+    if (!channel || channel.group !== selectedGroup) return "全部";
+    return channels.some(function (item) { return item.group === selectedGroup; })
+      ? selectedGroup
+      : "全部";
+  }
+
+  function rememberChannel(channel, index, selectedGroup) {
     if (!channel || !activeSource) return;
     pendingChannelMemories[activeSource.id] = {
       id: activeSource.id,
@@ -528,7 +565,8 @@
         name: channel.name || "",
         group: channel.group || ""
       },
-      index: index
+      index: index,
+      selectedGroup: selectedGroup || "全部"
     };
     clearTimeout(channelRememberTimer);
     channelRememberTimer = setTimeout(flushRememberedChannels, CHANNEL_REMEMBER_DELAY_MS);
@@ -796,7 +834,11 @@
 
       pendingPlaybackMetric.requestAt = getMonotonicTime();
       publishPlaybackMetric(pendingPlaybackMetric);
-      rememberChannel(state.channels[state.playingIndex], state.playingIndex);
+      rememberChannel(
+        state.channels[state.playingIndex],
+        state.playingIndex,
+        state.channelBrowser.selectedGroup
+      );
       dispatch({
         type: "START_PLAYBACK_ATTEMPT",
         expectedPlayingIndex: currentEffect.playingIndex
@@ -1094,6 +1136,7 @@
         applySourceConfig(storedSource);
         epgProgramsByChannel = {};
         var sourceViews = getSourceViews();
+        var initialIndex = getInitialChannelIndex(channels, storedSource);
         dispatch({
           type: "PLAYLIST_READY",
           channels: channels,
@@ -1102,7 +1145,8 @@
           activeSourceIndex: getActiveSourceIndex(sourceViews),
           canAddSource: sourceStore.canAdd(),
           playlistName: getPlaylistDisplayName(storedSource),
-          initialIndex: getInitialChannelIndex(channels, storedSource),
+          initialIndex: initialIndex,
+          initialGroup: getInitialChannelGroup(channels, storedSource, initialIndex),
           openChannels: Boolean(options.openChannels)
         });
         loadEpg(

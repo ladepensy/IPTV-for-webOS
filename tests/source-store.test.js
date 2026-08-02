@@ -34,16 +34,19 @@ var writesAfterActivation = storage.getWriteCount();
 store.setActive(added.id);
 assert.strictEqual(storage.getWriteCount(), writesAfterActivation);
 
-store.rememberChannel(added.id, { id: "channel-1", name: "One", group: "News" }, 3);
+store.rememberChannel(added.id, { id: "channel-1", name: "One", group: "News" }, 3, "News");
 assert.strictEqual(store.getById(added.id).lastChannel.index, 3);
+assert.strictEqual(store.getById(added.id).lastChannel.sourceId, added.id);
+assert.strictEqual(store.getById(added.id).lastChannel.selectedGroup, "News");
 var writesAfterChannel = storage.getWriteCount();
-store.rememberChannel(added.id, { id: "channel-1", name: "One", group: "News" }, 3);
+store.rememberChannel(added.id, { id: "channel-1", name: "One", group: "News" }, 3, "News");
 assert.strictEqual(storage.getWriteCount(), writesAfterChannel);
 store.rememberChannels([
-  { id: "source_config", channel: { id: "legacy-1", name: "Legacy One", group: "News" }, index: 1 },
-  { id: added.id, channel: { id: "channel-2", name: "Two", group: "Sports" }, index: 4 }
+  { id: "source_config", channel: { id: "legacy-1", name: "Legacy One", group: "News" }, index: 1, selectedGroup: "全部" },
+  { id: added.id, channel: { id: "channel-2", name: "Two", group: "Sports" }, index: 4, selectedGroup: "Sports" }
 ]);
 assert.strictEqual(storage.getWriteCount(), writesAfterChannel + 1);
+assert.strictEqual(store.getById(added.id).lastChannel.selectedGroup, "Sports");
 
 store.update(added.id, { name: "Backup 2", url: "https://example.test/new.m3u" });
 assert.strictEqual(store.getById(added.id).lastChannel, null);

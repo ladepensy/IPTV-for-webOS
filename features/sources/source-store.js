@@ -185,9 +185,11 @@
 
     function sameChannel(left, right) {
       return Boolean(left && right) &&
+        left.sourceId === right.sourceId &&
         left.channelId === right.channelId &&
         left.name === right.name &&
         left.group === right.group &&
+        left.selectedGroup === right.selectedGroup &&
         left.index === right.index;
     }
 
@@ -197,9 +199,11 @@
         var source = entry ? getById(entry.id) : null;
         if (!source || !entry.channel) return;
         var nextChannel = {
+          sourceId: source.id,
           channelId: entry.channel.id || "",
           name: entry.channel.name || "",
           group: entry.channel.group || "",
+          selectedGroup: String(entry.selectedGroup || "全部"),
           index: Number(entry.index) || 0
         };
         if (sameChannel(source.lastChannel, nextChannel)) return;
@@ -210,8 +214,8 @@
       return changed;
     }
 
-    function rememberChannel(id, channel, index) {
-      return rememberChannels([{ id: id, channel: channel, index: index }]);
+    function rememberChannel(id, channel, index, selectedGroup) {
+      return rememberChannels([{ id: id, channel: channel, index: index, selectedGroup: selectedGroup }]);
     }
 
     return {

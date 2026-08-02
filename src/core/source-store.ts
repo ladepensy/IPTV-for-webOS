@@ -20,8 +20,8 @@ export interface SourceStore {
   update(id: string, input: SourceInput): PlaylistSource;
   remove(id: string): PlaylistSource | null;
   setActive(id: string): PlaylistSource | null;
-  rememberChannel(id: string, channel: Channel, index: number): boolean;
-  rememberChannels(entries: Array<{id: string; channel: Channel; index: number}>): boolean;
+  rememberChannel(id: string, channel: Channel, index: number, selectedGroup?: string): boolean;
+  rememberChannels(entries: Array<{id: string; channel: Channel; index: number; selectedGroup?: string}>): boolean;
   displayName(source: PlaylistSource): string;
   canAdd(): boolean;
 }
@@ -185,15 +185,17 @@ export function create(options: {
     return source;
   }
 
-  function rememberChannels(entries: Array<{id: string; channel: Channel; index: number}>): boolean {
+  function rememberChannels(entries: Array<{id: string; channel: Channel; index: number; selectedGroup?: string}>): boolean {
     let changed = false;
     entries.forEach((entry) => {
       const source = entry ? getById(entry.id) : null;
       if (!source || !entry.channel) return;
       const next = {
+        sourceId: source.id,
         channelId: entry.channel.id || "",
         name: entry.channel.name || "",
         group: entry.channel.group || "",
+        selectedGroup: String(entry.selectedGroup || "全部"),
         index: Number(entry.index) || 0
       };
       if (source.lastChannel && JSON.stringify(source.lastChannel) === JSON.stringify(next)) return;
@@ -212,7 +214,7 @@ export function create(options: {
     update,
     remove,
     setActive,
-    rememberChannel: (id, channel, index) => rememberChannels([{id, channel, index}]),
+    rememberChannel: (id, channel, index, selectedGroup) => rememberChannels([{id, channel, index, selectedGroup}]),
     rememberChannels,
     displayName,
     canAdd: () => data.sources.length < MAX_SOURCES

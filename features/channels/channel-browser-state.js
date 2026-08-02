@@ -36,6 +36,11 @@
     return Math.max(0, Math.min(length - 1, index));
   }
 
+  function wrap(index, length) {
+    if (!length) return 0;
+    return ((index % length) + length) % length;
+  }
+
   function getGroups(channels) {
     var groups = ["全部"];
     channels.forEach(function (channel) {
@@ -66,6 +71,20 @@
     next.column = COLUMN_CHANNELS;
   }
 
+  function restoreGroup(next, group, channels) {
+    var groups = getGroups(channels);
+    var selectedGroup = String(group || "全部");
+    var groupIndex = groups.indexOf(selectedGroup);
+    var channel = channels[next.focusedChannelIndex];
+    if (groupIndex < 0 || (selectedGroup !== "全部" && (!channel || (channel.group || "其他") !== selectedGroup))) {
+      next.selectedGroup = "全部";
+      next.focusedGroupIndex = 1;
+      return;
+    }
+    next.selectedGroup = selectedGroup;
+    next.focusedGroupIndex = groupIndex + 1;
+  }
+
   function move(next, delta, context) {
     if (next.column === COLUMN_SOURCES) {
       next.focusedSourceIndex = clamp(
@@ -86,7 +105,7 @@
     var visibleIndices = getVisibleChannelIndices(next, context.channels);
     var position = visibleIndices.indexOf(next.focusedChannelIndex);
     if (position < 0) position = 0;
-    position = clamp(position + delta, visibleIndices.length);
+    position = wrap(position + delta, visibleIndices.length);
     if (visibleIndices.length) next.focusedChannelIndex = visibleIndices[position];
   }
 
@@ -100,11 +119,15 @@
 
     switch (event.type) {
       case "RESET":
-        return result(createInitialState(event.initialChannelIndex, event.initialSourceIndex));
+        var reset = createInitialState(event.initialChannelIndex, event.initialSourceIndex);
+        restoreGroup(reset, event.initialGroup, context.channels);
+        return result(reset);
 
       case "OPEN":
         next.column = COLUMN_SOURCES;
         if (event.playingIndex >= 0) next.focusedChannelIndex = event.playingIndex;
+        if (event.activeSourceIndex >= 0) next.focusedSourceIndex = event.activeSourceIndex;
+        restoreGroup(next, event.selectedGroup || next.selectedGroup, context.channels);
         return result(next);
 
       case "MOVE":

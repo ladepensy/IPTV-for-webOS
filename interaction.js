@@ -78,6 +78,29 @@
       return Math.max(0, Math.min(channels.length - 1, index));
     }
 
+    function getWrappedChannelIndex(index, delta, channels, selectedGroup) {
+      if (!channels.length) return 0;
+      var currentIndex = clampChannelIndex(index, channels);
+      var currentGroup = selectedGroup || "全部";
+      var groupIndices = [];
+      channels.forEach(function (channel, channelIndex) {
+        if (currentGroup === "全部" || (channel.group || "其他") === currentGroup) {
+          groupIndices.push(channelIndex);
+        }
+      });
+      var position = groupIndices.indexOf(currentIndex);
+      if (position < 0) {
+        currentGroup = channels[currentIndex].group || "其他";
+        groupIndices = [];
+        channels.forEach(function (channel, channelIndex) {
+          if ((channel.group || "其他") === currentGroup) groupIndices.push(channelIndex);
+        });
+        position = groupIndices.indexOf(currentIndex);
+      }
+      var targetPosition = ((position + delta) % groupIndices.length + groupIndices.length) % groupIndices.length;
+      return groupIndices[targetPosition];
+    }
+
     function getBrowserContext(nextState) {
       return {
         channels: nextState.channels,
@@ -97,11 +120,22 @@
     }
 
     function openChannels(nextState) {
+      var activeSourceIndex = 0;
+      nextState.playlistSources.some(function (source, index) {
+        if (source.id !== nextState.activeSourceId) return false;
+        activeSourceIndex = index;
+        return true;
+      });
       nextState.uiMode = constants.UI_MODE_CHANNELS;
       updateChannelBrowser(nextState, {
         type: "OPEN",
-        playingIndex: nextState.playingIndex
+        playingIndex: nextState.playingIndex,
+        activeSourceIndex: activeSourceIndex,
+        selectedGroup: nextState.channelBrowser.selectedGroup
       });
+      nextState.channelBrowser.column = nextState.playingIndex >= 0 && nextState.channels[nextState.playingIndex]
+        ? channelBrowserApi.constants.COLUMN_CHANNELS
+        : channelBrowserApi.constants.COLUMN_SOURCES;
     }
 
     function selectChannel(nextState, index) {
@@ -195,9 +229,11 @@
           var currentPlayingIndex = next.playingIndex >= 0
             ? next.playingIndex
             : next.channelBrowser.focusedChannelIndex;
-          var targetPlayingIndex = clampChannelIndex(
-            currentPlayingIndex + event.delta,
-            next.channels
+          var targetPlayingIndex = getWrappedChannelIndex(
+            currentPlayingIndex,
+            event.delta,
+            next.channels,
+            next.channelBrowser.selectedGroup
           );
 
           next.uiMode = constants.UI_MODE_INFO;
@@ -430,12 +466,13 @@
           updateChannelBrowser(next, {
             type: "RESET",
             initialChannelIndex: event.initialIndex,
-            initialSourceIndex: event.activeSourceIndex
+            initialSourceIndex: event.activeSourceIndex,
+            initialGroup: event.initialGroup
           });
           selectChannel(next, event.initialIndex);
           if (event.openChannels) {
             next.uiMode = constants.UI_MODE_CHANNELS;
-            next.channelBrowser.column = channelBrowserApi.constants.COLUMN_GROUPS;
+            next.channelBrowser.column = channelBrowserApi.constants.COLUMN_CHANNELS;
           }
           effects.push(effect("REMEMBER_CHANNEL"));
           effects.push(effect("START_PLAYBACK"));
