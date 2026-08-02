@@ -137,15 +137,10 @@ pnpm dev
 
 普通浏览器适合检查布局、M3U 解析和基本交互。遥控器焦点与部分 webOS 行为应在 Simulator 中验证；实际解码、换台和长时间播放必须在真机上验证。
 
-运行 TypeScript 核心测试、旧状态机回归测试和生产构建：
+运行 TypeScript 核心测试、当前状态机回归测试和生产构建：
 
 ```bash
 pnpm test
-node tests/interaction.test.js
-node tests/channel-browser-state.test.js
-node tests/channel-panel.test.js
-node tests/source-store.test.js
-node tests/source-form.test.js
 pnpm build
 ```
 

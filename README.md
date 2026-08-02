@@ -137,15 +137,10 @@ pnpm dev
 
 A regular browser is useful for checking layout, M3U parsing, and basic interaction. Validate remote focus and webOS behavior in the Simulator. Real decoding, channel changes, and long-running playback must be verified on a physical TV.
 
-Run the TypeScript tests, legacy state-machine regression tests, and production build:
+Run the TypeScript tests, the active state-machine regression test, and the production build:
 
 ```bash
 pnpm test
-node tests/interaction.test.js
-node tests/channel-browser-state.test.js
-node tests/channel-panel.test.js
-node tests/source-store.test.js
-node tests/source-form.test.js
 pnpm build
 ```
 

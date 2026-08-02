@@ -37,6 +37,6 @@ export default defineConfig({
     cssCodeSplit: false
   },
   test: {
-    include: ["src/**/*.test.ts"]
+    include: ["src/**/*.test.{ts,js}"]
   }
 });

@@ -1,12 +1,11 @@
 (function (root, factory) {
   "use strict";
 
-  var channelBrowserApi = typeof module === "object" && module.exports
-    ? require("./features/channels/channel-browser-state.js")
-    : root.IPTVChannelBrowserState;
-  var api = factory(channelBrowserApi);
-  if (typeof module === "object" && module.exports) module.exports = api;
-  if (root) root.IPTVInteraction = api;
+  if (typeof module === "object" && module.exports) {
+    module.exports = { createForChannelBrowser: factory };
+    return;
+  }
+  if (root) root.IPTVInteraction = factory(root.IPTVChannelBrowserState);
 })(typeof window !== "undefined" ? window : this, function (channelBrowserApi) {
   "use strict";
 

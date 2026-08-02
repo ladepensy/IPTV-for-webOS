@@ -1,7 +1,13 @@
-"use strict";
+import assert from "node:assert/strict";
+import {createRequire} from "node:module";
+import {it} from "vitest";
+import {channelBrowserApi} from "./channel-browser-state";
 
-var assert = require("assert");
-var interactionApi = require("../interaction.js");
+const require = createRequire(import.meta.url);
+const interactionModule = require("../../interaction.js");
+
+it("preserves interaction state-machine behavior", function () {
+var interactionApi = interactionModule.createForChannelBrowser(channelBrowserApi);
 var machine = interactionApi.create({
   maxPlaybackRetries: 2,
   getStreamInfo: function () {
@@ -233,4 +239,4 @@ assert.strictEqual(restoredState.channelBrowser.focusedGroupIndex, 3);
 assert.strictEqual(restoredState.channelBrowser.selectedGroup, "Sports");
 assert.strictEqual(restoredState.channelBrowser.focusedChannelIndex, 2);
 
-process.stdout.write("interaction tests passed\n");
+});
