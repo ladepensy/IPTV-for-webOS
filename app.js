@@ -91,6 +91,9 @@
   var playerPlaceholder = document.getElementById("player-placeholder");
   var playerMessage = document.getElementById("player-message");
   var playerDiagnostics = document.getElementById("player-diagnostics");
+  var nowPlayingLogo = document.getElementById("now-playing-logo");
+  var nowPlayingLogoImage = document.getElementById("now-playing-logo-image");
+  var nowPlayingLogoFallback = document.getElementById("now-playing-logo-fallback");
   var nowPlayingTitle = document.getElementById("now-playing-title");
   var nowPlayingGroup = document.getElementById("now-playing-group");
   var nowPlayingMedia = document.getElementById("now-playing-media");
@@ -454,10 +457,12 @@
       currentTitle.textContent = playingChannel.name;
       nowPlayingTitle.textContent = playingChannel.name;
       nowPlayingGroup.textContent = displayGroup(playingChannel.group);
+      renderNowPlayingLogo(playingChannel);
       renderNowPlayingProgram(playingChannel);
     } else {
       currentTitle.textContent = state.titleMessage;
       nowPlayingTitle.textContent = state.titleMessage;
+      renderNowPlayingLogo(null);
       renderNowPlayingProgram(null);
     }
 
@@ -624,6 +629,40 @@
     if (group === ALL_GROUP_ID) return t("group.all");
     return group;
   }
+
+  function renderNowPlayingLogo(channel) {
+    var logoUrl = channel && channel.logo ? String(channel.logo).trim() : "";
+    var initial = channel && channel.name
+      ? String(channel.name).trim().slice(0, 1).toUpperCase()
+      : "?";
+
+    nowPlayingLogo.classList.toggle("is-empty", !channel);
+    nowPlayingLogoFallback.textContent = initial || "?";
+
+    if (!logoUrl) {
+      nowPlayingLogoImage.dataset.logoUrl = "";
+      nowPlayingLogoImage.removeAttribute("src");
+      nowPlayingLogoImage.hidden = true;
+      nowPlayingLogoFallback.hidden = false;
+      return;
+    }
+
+    if (nowPlayingLogoImage.dataset.logoUrl === logoUrl) return;
+    nowPlayingLogoImage.dataset.logoUrl = logoUrl;
+    nowPlayingLogoImage.hidden = true;
+    nowPlayingLogoFallback.hidden = false;
+    nowPlayingLogoImage.src = logoUrl;
+  }
+
+  nowPlayingLogoImage.addEventListener("load", function () {
+    nowPlayingLogoImage.hidden = false;
+    nowPlayingLogoFallback.hidden = true;
+  });
+
+  nowPlayingLogoImage.addEventListener("error", function () {
+    nowPlayingLogoImage.hidden = true;
+    nowPlayingLogoFallback.hidden = false;
+  });
 
   function buildEpgRequestOptions(requestConfig) {
     requestConfig = requestConfig || EPG_REQUEST;

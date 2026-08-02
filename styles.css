@@ -333,6 +333,32 @@ h1 {
   min-width: 0;
 }
 
+.now-playing-logo {
+  display: grid;
+  width: 88px;
+  height: 88px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  margin-right: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  background: rgba(143, 220, 255, 0.12);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 30px;
+  font-weight: 750;
+}
+
+.now-playing-logo.is-empty {
+  opacity: 0.38;
+}
+
+.now-playing-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .now-playing::before {
   position: absolute;
   top: 17px;
@@ -529,6 +555,14 @@ kbd {
     right: 28px;
     bottom: 62px;
     left: 28px;
+  }
+
+  .now-playing-logo {
+    width: 70px;
+    height: 70px;
+    margin-right: 14px;
+    border-radius: 16px;
+    font-size: 24px;
   }
 
   footer {
