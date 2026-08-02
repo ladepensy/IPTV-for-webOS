@@ -6,6 +6,22 @@
 
 一个面向 LG webOS TV 的轻量 IPTV Web App。应用可从任意可访问的 HTTP/HTTPS 数据源获取 M3U 播放列表，并通过电视原生媒体能力播放其中的频道。
 
+## 界面截图
+
+截图在 webOS TV 25 Simulator 中以 1920×1080 取得。频道、分组、台标与节目名均来自一份虚构的演示播放列表；界面背后的画面是一张合成静帧，而非解码后的直播流。
+
+正在播放信息，包含频道台标、分组、播放清晰度与当前节目进度：
+
+![正在播放面板](docs/screenshots/now-playing.png)
+
+频道浏览器，焦点位于频道列表，右侧显示当前焦点频道的节目单：
+
+![频道浏览器：频道列表与节目单](docs/screenshots/channels.png)
+
+播放源、分组、频道三列完整展开时的浏览器：
+
+![三列浏览器：播放源、分组与频道](docs/screenshots/channel-browser.png)
+
 ## 当前功能
 
 - 从本地配置文件指定任意 M3U 数据源
@@ -48,7 +64,9 @@
 ├── app.js         # 保留的 HTMLVideoElement 播放与 webOS 副作用
 ├── vite.config.ts # Web 构建和 webOS 资源复制
 ├── dist/          # pnpm build 生成的 webOS 可运行目录（不提交）
-├── docs/interaction-design.md # 操作状态与事件转换规范
+├── docs/
+│   ├── interaction-design.md  # 操作状态与事件转换规范
+│   └── screenshots/           # README 使用的界面截图
 ├── config.example.js # 脱敏的本地配置模板
 ├── icon.png
 ├── largeIcon.png

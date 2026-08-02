@@ -6,6 +6,22 @@ English | [Simplified Chinese](README.zh-CN.md)
 
 The app fetches M3U playlists from any accessible HTTP or HTTPS source and plays their channels through the TV's native media capabilities.
 
+## Screenshots
+
+Captured at 1920×1080 in the webOS TV 25 Simulator. The channels, groups, logos, and programme titles come from a fictional demo playlist, and the backdrop behind the interface is a synthetic still frame rather than a decoded broadcast stream.
+
+Now playing information with channel logo, group, playback resolution, and current programme progress:
+
+![Now playing panel](docs/screenshots/now-playing.png)
+
+Channel browser focused on the channel list, with the TV guide for the focused channel:
+
+![Channel browser with channel list and TV guide](docs/screenshots/channels.png)
+
+The full three-column browser for sources, groups, and channels:
+
+![Three-column browser for sources, groups, and channels](docs/screenshots/channel-browser.png)
+
 ## Features
 
 - Configure any M3U source through a local configuration file.
@@ -48,7 +64,9 @@ The app fetches M3U playlists from any accessible HTTP or HTTPS source and plays
 ├── app.js         # HTMLVideoElement playback and webOS side effects
 ├── vite.config.ts # Web build and webOS asset copying
 ├── dist/          # Generated deployable webOS app; not committed
-├── docs/interaction-design.md
+├── docs/
+│   ├── interaction-design.md
+│   └── screenshots/  # Interface screenshots used by the README
 ├── config.example.js
 ├── icon.png
 ├── largeIcon.png
