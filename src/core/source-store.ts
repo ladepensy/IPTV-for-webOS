@@ -195,6 +195,7 @@ export function create(options: {
       const next = {
         sourceId: source.id,
         channelId: entry.channel.id || "",
+        url: entry.channel.url || "",
         name: entry.channel.name || "",
         group: entry.channel.group || "",
         selectedGroup: String(entry.selectedGroup || ALL_GROUP_ID),

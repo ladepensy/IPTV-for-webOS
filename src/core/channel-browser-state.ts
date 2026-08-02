@@ -1,4 +1,4 @@
-import type {Channel, SourceView} from "./types";
+import type {Channel, LastChannel, SourceView} from "./types";
 
 export const COLUMN_SOURCES = 0;
 export const COLUMN_GROUPS = 1;
@@ -79,6 +79,39 @@ export function getGroups(channels: Channel[]): string[] {
 export function getChannelFavoriteKey(channel: Channel): string {
   if (channel.url) return `url:${channel.url}`;
   return `channel:${channel.id}|${channel.group}|${channel.name}`;
+}
+
+export function getRememberedChannelIndex(channels: Channel[], saved: Partial<LastChannel> | null): number {
+  if (!saved) return 0;
+  if (saved.url) {
+    const urlIndex = channels.findIndex((channel) => channel.url === saved.url);
+    if (urlIndex >= 0) return urlIndex;
+  }
+
+  const savedIndex = Number(saved.index);
+  if (savedIndex >= 0 && savedIndex < channels.length) {
+    const indexedChannel = channels[savedIndex];
+    const idMatches = !saved.channelId || indexedChannel.id === saved.channelId;
+    const nameMatches = !saved.name || indexedChannel.name === saved.name;
+    const groupMatches = !saved.group || indexedChannel.group === saved.group;
+    if (idMatches && nameMatches && groupMatches) return savedIndex;
+  }
+
+  if (saved.name) {
+    const matches = channels
+      .map((channel, index) => ({channel, index}))
+      .filter(({channel}) => channel.name === saved.name && channel.group === saved.group);
+    if (matches.length === 1) return matches[0].index;
+  }
+
+  if (saved.channelId) {
+    const matches = channels
+      .map((channel, index) => ({channel, index}))
+      .filter(({channel}) => channel.id === saved.channelId);
+    if (matches.length === 1) return matches[0].index;
+  }
+
+  return savedIndex >= 0 && savedIndex < channels.length ? savedIndex : 0;
 }
 
 function isFavorite(channel: Channel, favoriteChannelKeys: string[] = []): boolean {
@@ -283,6 +316,7 @@ export const channelBrowserApi = {
   copyState,
   getGroups,
   getChannelFavoriteKey,
+  getRememberedChannelIndex,
   getVisibleChannelIndices,
   transition
 };

@@ -8,6 +8,7 @@ import {
   FAVORITES_GROUP_ID,
   getChannelFavoriteKey,
   getGroups,
+  getRememberedChannelIndex,
   OTHER_GROUP_ID,
   transition
 } from "./channel-browser-state";
@@ -48,6 +49,21 @@ describe("source store core", () => {
     expect(store.canAdd()).toBe(false);
     expect(() => normalizeUrl("file:///playlist.m3u")).toThrow(/HTTP/);
   });
+
+  it("remembers the exact channel stream URL", () => {
+    const store = createSourceStore({
+      storage: createStorage(),
+      legacyConfig: {url: "https://example.test/list.m3u", name: "Home"}
+    });
+    store.rememberChannel("source_config", {
+      id: "news",
+      name: "News",
+      group: "News",
+      logo: "",
+      url: "https://example.test/news-hd"
+    }, 1);
+    expect(store.getActive()?.lastChannel?.url).toBe("https://example.test/news-hd");
+  });
 });
 
 describe("channel browser core", () => {
@@ -61,6 +77,26 @@ describe("channel browser core", () => {
     const hd = {id: "news", name: "News HD", group: "News", logo: "", url: "https://example.test/news-hd"};
     const sd = {id: "news", name: "News SD", group: "News", logo: "", url: "https://example.test/news-sd"};
     expect(getChannelFavoriteKey(hd)).not.toBe(getChannelFavoriteKey(sd));
+  });
+
+  it("restores the exact stream when channels share an id and name", () => {
+    const channels = [
+      {id: "news", name: "News", group: "News", logo: "", url: "https://example.test/news-sd"},
+      {id: "news", name: "News", group: "News", logo: "", url: "https://example.test/news-hd"}
+    ];
+    expect(getRememberedChannelIndex(channels, {
+      channelId: "news",
+      url: "https://example.test/news-hd",
+      name: "News",
+      group: "News",
+      index: 1
+    })).toBe(1);
+    expect(getRememberedChannelIndex(channels, {
+      channelId: "news",
+      name: "News",
+      group: "News",
+      index: 1
+    })).toBe(1);
   });
 
   it("keeps remote navigation deterministic", () => {

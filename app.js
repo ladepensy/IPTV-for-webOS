@@ -594,8 +594,6 @@
 
   function getInitialChannelIndex(channels, source) {
     var saved = source && source.lastChannel ? source.lastChannel : null;
-    var matchedIndex = -1;
-
     if (!saved) {
       try {
         var legacySaved = JSON.parse(window.localStorage.getItem(LAST_CHANNEL_STORAGE_KEY) || "null");
@@ -608,32 +606,7 @@
     }
 
     if (!saved) return 0;
-
-    if (saved.channelId) {
-      channels.some(function (channel, index) {
-        if (channel.id === saved.channelId) {
-          matchedIndex = index;
-          return true;
-        }
-        return false;
-      });
-    }
-
-    if (matchedIndex < 0 && saved.name) {
-      channels.some(function (channel, index) {
-        if (channel.name === saved.name && channel.group === saved.group) {
-          matchedIndex = index;
-          return true;
-        }
-        return false;
-      });
-    }
-
-    if (matchedIndex < 0 && Number(saved.index) >= 0 && Number(saved.index) < channels.length) {
-      matchedIndex = Number(saved.index);
-    }
-
-    return matchedIndex >= 0 ? matchedIndex : 0;
+    return window.IPTVChannelBrowserState.getRememberedChannelIndex(channels, saved);
   }
 
   function getInitialChannelGroup(channels, source, channelIndex) {
@@ -659,6 +632,7 @@
       id: activeSource.id,
       channel: {
         id: channel.id || "",
+        url: channel.url || "",
         name: channel.name || "",
         group: channel.group || ""
       },

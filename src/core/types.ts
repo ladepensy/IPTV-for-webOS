@@ -15,6 +15,7 @@ export interface Program {
 export interface LastChannel {
   sourceId?: string;
   channelId: string;
+  url?: string;
   name: string;
   group: string;
   selectedGroup?: string;
