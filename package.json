@@ -1,7 +1,10 @@
 {
-  "name": "lg-webos-iptv",
+  "name": "iptv-for-webos",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "repository": "https://github.com/ladepensy/IPTV-for-webOS",
+  "homepage": "https://github.com/ladepensy/IPTV-for-webOS",
   "packageManager": "pnpm@11.9.0",
   "scripts": {
     "dev": "vite",

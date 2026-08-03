@@ -6,6 +6,14 @@ English | [Simplified Chinese](README.zh-CN.md)
 
 The app fetches M3U playlists from any accessible HTTP or HTTPS source and plays their channels through the TV's native media capabilities.
 
+## Legal IPTV use
+
+This project is a player, not a channel or content provider. It does not bundle playlists, channels, programme data, or media streams. Only add M3U, XMLTV, image, and media sources that you own or are legally authorized to access. Do not use the app to bypass DRM, access unauthorized broadcasts, or redistribute copyrighted content. You are responsible for complying with the laws, licenses, terms of service, and network policies that apply to every source you configure.
+
+## Privacy
+
+The app sends requests to the playlist, programme, image, and media endpoints that you configure. Source settings, including URLs and configured request metadata, may be stored in the TV's local app storage so the app can remember them. The project does not intentionally include advertising or analytics services. Do not enter credentials or private URLs unless you understand that the TV and those configured services will receive them, and do not share screenshots, logs, or exported app data containing them.
+
 ## Screenshots
 
 Captured at 1920×1080 in the webOS TV 25 Simulator. The channels, groups, logos, and programme titles come from a fictional demo playlist, and the backdrop behind the interface is a synthetic still frame rather than a decoded broadcast stream.
@@ -453,4 +461,4 @@ After initialization on the TV, edit source names and M3U addresses through the 
 
 ## License
 
-Private project. Unauthorized distribution is prohibited.
+Licensed under the [MIT License](LICENSE).
