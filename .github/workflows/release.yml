@@ -57,7 +57,35 @@ jobs:
           ares-package dist -o release
           ipk_path="$(find release -maxdepth 1 -type f -name '*.ipk' -print -quit)"
           test -n "$ipk_path"
-          sha256sum "$ipk_path" > "$ipk_path.sha256"
+          ipk_name="$(basename "$ipk_path")"
+          version="${GITHUB_REF_NAME#v}"
+          sha256="$(sha256sum "$ipk_path" | awk '{print $1}')"
+          manifest="release/com.odyssey.webos.iptv.manifest.json"
+          RELEASE_VERSION="$version" \
+          IPK_NAME="$ipk_name" \
+          IPK_SHA256="$sha256" \
+          RELEASE_TAG="$GITHUB_REF_NAME" \
+          node -e '
+            const fs = require("fs");
+            const version = process.env.RELEASE_VERSION;
+            const ipkName = process.env.IPK_NAME;
+            const sha256 = process.env.IPK_SHA256;
+            const tag = process.env.RELEASE_TAG;
+            const manifest = {
+              id: "com.odyssey.webos.iptv",
+              version,
+              type: "web",
+              title: "IPTV for webOS",
+              appDescription: "A lightweight IPTV player for user-provided legal M3U playlists.",
+              iconUri: "https://raw.githubusercontent.com/ladepensy/IPTV-for-webOS/main/largeIcon.png",
+              sourceUrl: "https://github.com/ladepensy/IPTV-for-webOS",
+              rootRequired: false,
+              ipkUrl: `https://github.com/ladepensy/IPTV-for-webOS/releases/download/${tag}/${ipkName}`,
+              ipkHash: {sha256}
+            };
+            fs.writeFileSync("release/com.odyssey.webos.iptv.manifest.json", JSON.stringify(manifest, null, 2) + "\\n");
+          '
+          printf '%s  %s\n' "$sha256" "$ipk_name" > "$ipk_path.sha256"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -66,6 +94,7 @@ jobs:
           files: |
             release/*.ipk
             release/*.ipk.sha256
+            release/*.manifest.json
           body: |
             This release was built from `${{ github.ref_name }}`.
 
