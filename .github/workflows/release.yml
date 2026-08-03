@@ -77,7 +77,7 @@ jobs:
               type: "web",
               title: "IPTV for webOS",
               appDescription: "A lightweight IPTV player for user-provided legal M3U playlists.",
-              iconUri: "https://raw.githubusercontent.com/ladepensy/IPTV-for-webOS/main/largeIcon.png",
+              iconUri: "https://media.githubusercontent.com/media/ladepensy/IPTV-for-webOS/refs/heads/main/largeIcon.png",
               sourceUrl: "https://github.com/ladepensy/IPTV-for-webOS",
               rootRequired: false,
               ipkUrl: `https://github.com/ladepensy/IPTV-for-webOS/releases/download/${tag}/${ipkName}`,
