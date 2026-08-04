@@ -83,7 +83,7 @@ jobs:
               ipkUrl: `https://github.com/ladepensy/IPTV-for-webOS/releases/download/${tag}/${ipkName}`,
               ipkHash: {sha256}
             };
-            fs.writeFileSync("release/com.odyssey.webos.iptv.manifest.json", JSON.stringify(manifest, null, 2) + "\\n");
+            fs.writeFileSync("release/com.odyssey.webos.iptv.manifest.json", JSON.stringify(manifest, null, 2) + "\n");
           '
           printf '%s  %s\n' "$sha256" "$ipk_name" > "$ipk_path.sha256"
 
